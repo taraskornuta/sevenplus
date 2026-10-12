@@ -20,13 +20,15 @@ fn main() -> eframe::Result {
     let settings = Settings::load();
     let (theme, theme_error) = app::load_theme(&settings);
     let aero = settings.frame == FrameStyle::Aero;
-    let size = app::window_size(&theme, &settings, settings.frame);
+    let natural = app::window_size(&theme, &settings, settings.frame);
+    let scale = settings.scale.clamp(app::MIN_SCALE, app::MAX_SCALE);
     let viewport = egui::ViewportBuilder::default()
         .with_title("Calculator")
         .with_app_id("sevenplus")
         .with_icon(icon())
-        .with_inner_size(size)
-        .with_resizable(false)
+        .with_inner_size(natural * scale)
+        .with_min_inner_size(natural * app::MIN_SCALE)
+        .with_resizable(true)
         .with_maximize_button(false)
         .with_decorations(!aero)
         .with_transparent(aero);

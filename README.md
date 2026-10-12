@@ -13,6 +13,7 @@ Runs on Linux (.deb, .rpm), Windows and macOS.
 - **History** (Ctrl+H), **Digit grouping**, **Copy/Paste**.
 - **Unit conversion** (Ctrl+U), **Date calculation** (Ctrl+E), and **Worksheets**: mortgage, vehicle lease, fuel economy in mpg and L/100 km.
 - Window frame: native OS frame, or a hand-drawn Windows 7 **Aero glass** frame.
+- **Resizable**: drag a corner or edge and the whole UI scales uniformly, keeping the Win7 proportions. The scale is remembered (`scale` in `settings.toml`), and **View ▸ Reset size** returns to 100%. The Aero frame has its own resize grip in the bottom-right corner.
 
 ## Keyboard
 
@@ -42,7 +43,7 @@ The settings live in the per-user config folder:
 | Windows | `%APPDATA%\sevenplus\config\` |
 | macOS | `~/Library/Application Support/sevenplus/` |
 
-- `settings.toml` holds the active theme, the window frame (`frame = "native"` or `"aero"`), the mode, history and other options. The app saves it automatically.
+- `settings.toml` holds the active theme, the window frame (`frame = "native"` or `"aero"`), the UI `scale`, the mode, history and other options. The app saves it automatically.
 - `themes/*.toml` are the theme files. `win7.toml` and `win7-dark.toml` are written there on first run.
 
 To make your own theme, copy `win7.toml` to a new file name and edit it. Then select it under **View ▸ Theme**. The same menu has **Open themes folder**.

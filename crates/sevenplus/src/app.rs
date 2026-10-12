@@ -10,7 +10,7 @@ use calc_core::{Angle, Base, Calculator, Cmd, Mode, Num, WordSize};
 use eframe::egui::{
     self, Align2, Button, Color32, Context, Event, FontData, FontDefinitions, FontFamily, FontId,
     Id, Key as EKey, Modifiers, Painter, Pos2, Rect, Sense, Stroke, StrokeKind, TextStyle,
-    UiBuilder, Vec2, ViewportCommand, pos2, vec2,
+    UiBuilder, Vec2, ViewportCommand, pos2, vec2, viewport::ResizeDirection,
 };
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -19,6 +19,11 @@ const SELAWIK: &[u8] = include_bytes!("../../../assets/fonts/selawk.ttf");
 const EXTRAS_WIDTH: f32 = 300.0;
 const EXTRAS_MIN_HEIGHT: f32 = 300.0;
 const FLASH_SECS: f64 = 0.12;
+/// Limits of the UI scale set by resizing the window.
+pub const MIN_SCALE: f32 = 0.75;
+pub const MAX_SCALE: f32 = 4.0;
+/// How long to wait for the window manager to apply a requested size.
+const RESIZE_WAIT_SECS: f64 = 1.0;
 
 /// Positions of every part of the calculator body, relative to the body origin.
 struct Layout {
@@ -156,6 +161,9 @@ pub struct App {
     about_open: bool,
     stat_selected: Option<usize>,
     flash: Option<(Cmd, f64)>,
+    /// Requested physical window size and when it was requested; the scale is frozen
+    /// until the window reaches it so a mode switch doesn't change the zoom.
+    pending_size: Option<(Vec2, f64)>,
     #[cfg(feature = "screenshot")]
     screenshot: Option<(String, u32)>,
 }
@@ -187,11 +195,15 @@ impl App {
             about_open: false,
             stat_selected: None,
             flash: None,
+            pending_size: None,
             #[cfg(feature = "screenshot")]
             screenshot: std::env::var("SEVENPLUS_SCREENSHOT").ok().map(|p| (p, 0)),
         };
         app.theme_mtime = mtime(&app.settings);
         app.apply_theme(ctx);
+        // The window size owns the zoom, so egui's Ctrl +/-/0 zoom keys are disabled.
+        ctx.options_mut(|o| o.zoom_with_keyboard = false);
+        ctx.set_zoom_factor(app.settings.scale.clamp(MIN_SCALE, MAX_SCALE));
         app
     }
 
@@ -417,6 +429,53 @@ impl App {
             (Mode::Programmer, EKey::F4) => self.calc.set_word(WordSize::Byte),
             _ => {}
         }
+    }
+
+    /// Keeps the zoom factor in step with the window size, so resizing scales the whole UI
+    /// uniformly. `natural` is the window size at scale 1.0.
+    fn update_scale(&mut self, ctx: &Context, natural: Vec2) {
+        let now = ctx.input(|i| i.time);
+        if self.last_size != Some(natural) {
+            self.request_size(ctx, natural, now);
+        }
+        // `viewport_rect` rather than `viewport().inner_rect`: the latter needs the window
+        // position, which Wayland never reports.
+        let (size, native) = ctx.input(|i| {
+            (
+                i.viewport_rect().size(),
+                i.viewport().native_pixels_per_point,
+            )
+        });
+        let Some(native) = native else {
+            return;
+        };
+        let phys = size * ctx.pixels_per_point();
+        if let Some((target, since)) = self.pending_size {
+            if (phys - target).length() > 2.0 && now - since < RESIZE_WAIT_SECS {
+                ctx.request_repaint();
+                return;
+            }
+            self.pending_size = None;
+        }
+        let k = (phys.x / (native * natural.x))
+            .min(phys.y / (native * natural.y))
+            .clamp(MIN_SCALE, MAX_SCALE);
+        if (k - ctx.zoom_factor()).abs() > 0.001 {
+            ctx.set_zoom_factor(k);
+            self.settings.scale = (k * 100.0).round() / 100.0;
+        }
+    }
+
+    /// Resizes the window to `natural` at the current scale (after a mode or theme change).
+    fn request_size(&mut self, ctx: &Context, natural: Vec2, now: f64) {
+        let k = ctx.zoom_factor();
+        ctx.send_viewport_cmd(ViewportCommand::MinInnerSize(natural * MIN_SCALE / k));
+        ctx.send_viewport_cmd(ViewportCommand::InnerSize(natural));
+        self.last_size = Some(natural);
+        let native = ctx
+            .input(|i| i.viewport().native_pixels_per_point)
+            .unwrap_or(1.0);
+        self.pending_size = Some((natural * k * native, now));
     }
 
     fn sync_settings(&mut self) {
@@ -967,6 +1026,11 @@ impl App {
                 open_folder(&config::themes_dir());
             }
         });
+        if Self::item(ui, false, "Reset size", "") {
+            ui.ctx().set_zoom_factor(1.0);
+            self.settings.scale = 1.0;
+            self.last_size = None;
+        }
         ui.menu_button("Window frame", |ui| {
             for (f, label) in [
                 (FrameStyle::Native, "Native"),
@@ -1121,6 +1185,7 @@ impl App {
         {
             ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
         }
+        self.resize_handles(ui, win, &t);
         p.rect_stroke(
             client.expand(1.0),
             0.0,
@@ -1128,6 +1193,52 @@ impl App {
             StrokeKind::Inside,
         );
         client
+    }
+
+    /// Borderless windows have no OS resize border: right/bottom edges and a corner grip.
+    fn resize_handles(&self, ui: &egui::Ui, win: Rect, t: &crate::theme::TitlebarCfg) {
+        let (bw, grip) = (t.border_width.max(4.0), 16.0);
+        let corner = Rect::from_min_max(win.max - vec2(grip, grip), win.max);
+        let handles = [
+            (
+                corner,
+                ResizeDirection::SouthEast,
+                egui::CursorIcon::ResizeSouthEast,
+            ),
+            (
+                Rect::from_min_max(
+                    pos2(win.right() - bw, win.top() + t.height),
+                    pos2(win.right(), corner.top()),
+                ),
+                ResizeDirection::East,
+                egui::CursorIcon::ResizeEast,
+            ),
+            (
+                Rect::from_min_max(
+                    pos2(win.left(), win.bottom() - bw),
+                    pos2(corner.left(), win.bottom()),
+                ),
+                ResizeDirection::South,
+                egui::CursorIcon::ResizeSouth,
+            ),
+        ];
+        for (i, (rect, dir, cursor)) in handles.into_iter().enumerate() {
+            let resp = ui
+                .interact(rect, Id::new(("resize", i)), Sense::drag())
+                .on_hover_cursor(cursor);
+            if resp.drag_started() {
+                ui.ctx()
+                    .send_viewport_cmd(ViewportCommand::BeginResize(dir));
+            }
+        }
+        // Grip: three diagonal rows of dots, like Win7 status-bar grips.
+        let p = ui.painter();
+        for row in 0..3 {
+            for j in 0..=row {
+                let c = win.max - vec2(4.0 + 3.0 * j as f32, 4.0 + 3.0 * (row - j) as f32);
+                p.circle_filled(c, 0.9, t.glyph_outline.0);
+            }
+        }
     }
 
     fn draw_theme_error(&mut self, ui: &egui::Ui, win: Rect) {
@@ -1243,18 +1354,19 @@ impl eframe::App for App {
             },
             frame,
         );
-        if self.last_size != Some(want) {
-            ctx.send_viewport_cmd(ViewportCommand::InnerSize(want));
-            self.last_size = Some(want);
-        }
+        self.update_scale(&ctx, want);
 
         let win = ui.max_rect();
         let client = match frame {
             FrameStyle::Aero => self.draw_aero_frame(ui, win),
             FrameStyle::Native => win,
         };
-        let off = client.min.to_vec2();
         paint::gradient_rect(ui.painter(), client, 0.0, &self.theme.window.background);
+        // When the window's aspect differs from the calculator's, center the body below a
+        // full-width menu bar.
+        let spare = ((client.size() - l.size) / 2.0).max(Vec2::ZERO);
+        let off = client.min.to_vec2() + spare;
+        let menu = Rect::from_min_size(client.min, vec2(client.width(), l.menu.height()));
 
         self.draw_display(ui, l.display.translate(off));
         if let Some(b) = l.bits {
@@ -1292,7 +1404,7 @@ impl eframe::App for App {
                 extras::show(ui, which, &mut self.extras, grouping);
             });
         }
-        self.draw_menu(ui, l.menu.translate(off));
+        self.draw_menu(ui, menu);
         self.about(&ctx);
         self.draw_theme_error(ui, win);
         if self
@@ -1322,6 +1434,15 @@ impl App {
                 .and_then(|m| toml::Value::String(m).try_into().ok())
             {
                 self.set_mode(m);
+            }
+            // SEVENPLUS_SCREENSHOT_RESIZE="WxH" simulates the user resizing the window.
+            if let Some((w, h)) = std::env::var("SEVENPLUS_SCREENSHOT_RESIZE")
+                .ok()
+                .and_then(|s| s.split_once('x').map(|(w, h)| (w.parse(), h.parse())))
+                .and_then(|(w, h)| Some((w.ok()?, h.ok()?)))
+            {
+                let ppp = ctx.pixels_per_point();
+                ctx.send_viewport_cmd(ViewportCommand::InnerSize(vec2(w, h) / ppp));
             }
             for ch in std::env::var("SEVENPLUS_SCREENSHOT_INPUT")
                 .unwrap_or_default()

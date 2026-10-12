@@ -39,6 +39,8 @@ pub struct Settings {
     pub angle: Angle,
     pub base: Base,
     pub word: WordSize,
+    /// UI scale, changed by resizing the window (1.0 = Win7 size).
+    pub scale: f32,
 }
 
 impl Default for Settings {
@@ -53,6 +55,7 @@ impl Default for Settings {
             angle: Angle::Degrees,
             base: Base::Dec,
             word: WordSize::Qword,
+            scale: 1.0,
         }
     }
 }
