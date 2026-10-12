@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SevenPlus Calculator
+GenericName=Calculator
+Comment=Windows 7 style calculator with themes
+Exec=sevenplus
+Icon=sevenplus
+Terminal=false
+Categories=Utility;Calculator;
+Keywords=calculator;calc;math;programmer;scientific;
+StartupWMClass=sevenplus

@@ -1,0 +1,74 @@
+# SevenPlus theme: Windows 7 Dark
+# Only the keys that differ from the built-in Windows 7 theme are listed.
+
+name = "Windows 7 Dark"
+
+[window]
+background = ["#2b3038", "#1f232a"]
+
+[menu]
+background = ["#343a44", "#2b3038"]
+text = "#e6e9ee"
+hover = "#3f5878"
+hover_border = "#5d7fab"
+popup_background = "#2b3038"
+popup_border = "#56606f"
+
+[titlebar]
+background = ["#3a4250f0", "#2c3340f0", "#262c37f0", "#303846f0"]
+border = "#11151b"
+inner_border = "#ffffff30"
+text = "#e6e9ee"
+text_glow = "#00000080"
+button = ["#4a5363d0", "#3b4352d0", "#2f3643d0", "#3a4251d0"]
+button_border = "#11151b"
+
+[display]
+background = ["#1b2028", "#141820"]
+border = "#56606f"
+text = "#f0f3f7"
+expression_text = "#9aa5b5"
+indicator_text = "#c9d3e0"
+history_text = "#c9d3e0"
+history_hover = "#2f3d52"
+
+[button.normal]
+gradient = ["#4a5160", "#3f4654", "#353b47", "#30363f"]
+border = "#1a1e24"
+highlight = "#ffffff28"
+text = "#eef1f5"
+
+[button.hover]
+gradient = ["#5b6f8e", "#4d6282", "#40557a", "#4a5f84"]
+border = "#1a1e24"
+highlight = "#ffffff40"
+text = "#ffffff"
+
+[button.pressed]
+gradient = ["#2d3f5c", "#33486a", "#3a5277", "#33496c"]
+border = "#0e1116"
+highlight = "#ffffff18"
+text = "#ffffff"
+
+[button.disabled]
+gradient = ["#363b44", "#30353d"]
+border = "#262a31"
+highlight = "#ffffff10"
+text = "#6c7584"
+
+[button.equals]
+gradient = ["#5d8fd6", "#3f74c2", "#2f63b0", "#3a6fbd"]
+text = "#ffffff"
+
+[controls]
+text = "#e6e9ee"
+background = "#1b2028"
+border = "#56606f"
+accent = "#6ea3ee"
+group_border = "#4a5361"
+hover = "#33404f"
+
+[bits]
+text = "#e6e9ee"
+dim = "#6c7584"
+index = "#8fa4c4"

@@ -1,0 +1,87 @@
+name: Release
+
+# Push a tag like v0.1.0 to build all packages and attach them to a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04 # older glibc = packages run on more distributions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libgl1-mesa-dev
+      - run: cargo install cargo-deb cargo-generate-rpm --locked
+      - run: cargo build --release -p sevenplus
+      - run: cargo deb -p sevenplus --no-build
+      - run: cargo generate-rpm -p crates/sevenplus
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            target/debian/*.deb
+            target/generate-rpm/*.rpm
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-packager --locked
+      - name: Build universal binary
+        run: |
+          cargo build --release -p sevenplus --target aarch64-apple-darwin
+          cargo build --release -p sevenplus --target x86_64-apple-darwin
+          mkdir -p target/release
+          lipo -create -output target/release/sevenplus \
+            target/aarch64-apple-darwin/release/sevenplus \
+            target/x86_64-apple-darwin/release/sevenplus
+      - run: cargo packager -p sevenplus --release --formats app,dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: target/packages/*.dmg
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-packager --locked
+      - run: cargo build --release -p sevenplus
+      - run: cargo packager -p sevenplus --release --formats nsis
+      - name: Portable zip
+        run: Compress-Archive -Path target/release/sevenplus.exe -DestinationPath target/packages/sevenplus-windows-x64-portable.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            target/packages/*.exe
+            target/packages/*.zip
+
+  release:
+    needs: [linux, macos, windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          generate_release_notes: true
