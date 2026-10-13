@@ -36,6 +36,7 @@ Arithmetic is exact. `0.1 + 0.2` is `0.3` and `1 / 3 * 3` is `1`, because number
 
 - Hex, Dec, Oct and Bin with Qword, Dword, Word and Byte word sizes. Values are two's-complement and wrap at the word size, just like integers in a program.
 - `And`, `Or`, `Xor`, `Not`, `Lsh`, `Rsh`, `RoL`, `RoR`, `Mod`, and integer division that truncates toward zero.
+- C syntax: the expression line shows `12 << 2 &`, `~x`, `%`, and you can type or paste `(1<<4)|3`. Buttons show the C signs too; Preferences can switch them back to `Lsh`, `And`, `Not`…
 - Keys that don't fit the current base are disabled. The 64-bit panel shows every bit; click a bit to flip it.
 
 ### Statistics mode

@@ -72,6 +72,8 @@ pub struct Settings {
     pub copy_locale_decimal: bool,
     /// Copy includes digit-group separators when grouping is on (STD-010).
     pub copy_grouping: bool,
+    /// Programmer-mode buttons show C operator signs (`<<`, `&`, `~`…) instead of words.
+    pub programmer_c_signs: bool,
 }
 
 impl Default for Settings {
@@ -97,6 +99,7 @@ impl Default for Settings {
             group_separator: None,
             copy_locale_decimal: false,
             copy_grouping: false,
+            programmer_c_signs: true,
         }
     }
 }

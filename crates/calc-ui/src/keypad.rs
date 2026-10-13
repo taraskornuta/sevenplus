@@ -72,6 +72,16 @@ impl App {
             None => plain(label),
         };
         resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, &name));
+        // Programmer operators may show their C sign; the word stays as name and tooltip.
+        let c_sign = (self.calc.mode == Mode::Programmer && self.settings.programmer_c_signs)
+            .then(|| layout::c_label(key))
+            .flatten();
+        let label = c_sign.unwrap_or(label);
+        let resp = if c_sign.is_some() {
+            resp.on_hover_text(&name)
+        } else {
+            resp
+        };
         let now = ui.input(|i| i.time);
         let flashing = self
             .flash

@@ -328,6 +328,20 @@ pub fn a11y_id(key: Key, label: &str) -> Option<&'static str> {
     })
 }
 
+/// The C-language sign shown instead of a Programmer key's word label.
+pub fn c_label(key: Key) -> Option<&'static str> {
+    Some(match key {
+        Key::Op(BinOp::Mod) => "%",
+        Key::Op(BinOp::And) => "&",
+        Key::Op(BinOp::Or) => "|",
+        Key::Op(BinOp::Xor) => "^",
+        Key::Op(BinOp::Lsh) => "<<",
+        Key::Op(BinOp::Rsh) => ">>",
+        Key::Func(Func::Not) => "~",
+        _ => return None,
+    })
+}
+
 // ---- mode layout tables ---------------------------------------------------------------
 
 /// What sits left of the main keypad.

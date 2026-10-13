@@ -124,6 +124,19 @@ impl BinOp {
             BinOp::Rsh => "Rsh",
         }
     }
+
+    /// The C-language operator, used in Programmer mode's expression line.
+    pub fn c_symbol(self) -> &'static str {
+        match self {
+            BinOp::Mod => "%",
+            BinOp::And => "&",
+            BinOp::Or => "|",
+            BinOp::Xor => "^",
+            BinOp::Lsh => "<<",
+            BinOp::Rsh => ">>",
+            op => op.symbol(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -873,6 +886,15 @@ impl Calculator {
             .unwrap_or_else(|| self.format_num(&self.value))
     }
 
+    /// Operator text in the expression line: C syntax in Programmer mode.
+    fn op_text(&self, op: BinOp) -> &'static str {
+        if self.mode == Mode::Programmer {
+            op.c_symbol()
+        } else {
+            op.symbol()
+        }
+    }
+
     fn binary(&mut self, op: BinOp) -> Result<(), CalcError> {
         if !self.enabled(Key::Op(op)) {
             return Ok(());
@@ -881,8 +903,9 @@ impl Calculator {
             // Pressing another operator replaces the pending one (STD-002).
             if let Some(last) = self.levels.last_mut().and_then(|l| l.last_mut()) {
                 last.1 = op;
+                let text = self.op_text(op);
                 if let Some(t) = self.tokens.last_mut() {
-                    *t = op.symbol().into();
+                    *t = text.into();
                 }
                 return Ok(());
             }
@@ -906,7 +929,7 @@ impl Calculator {
         self.value = v;
         self.operand_text = None;
         self.tokens.push(text);
-        self.tokens.push(op.symbol().into());
+        self.tokens.push(self.op_text(op).into());
         self.last_was_op = true;
         Ok(())
     }
@@ -951,7 +974,7 @@ impl Calculator {
                 let expr = format!(
                     "{} {} {}",
                     self.operand_text(),
-                    op.symbol(),
+                    self.op_text(op),
                     self.format_num(&rhs)
                 );
                 self.value = self.apply(&self.value, op, &rhs)?;
@@ -1014,7 +1037,16 @@ impl Calculator {
         self.commit();
         let text = self.operand_text();
         self.value = self.apply_func(f, &self.value)?;
-        self.operand_text = Some(format!("{}({text})", f.name(self.angle)));
+        self.operand_text = Some(if self.mode == Mode::Programmer && f == Func::Not {
+            // C syntax: ~x, parenthesized when the operand is an expression.
+            if text.contains(' ') && !text.starts_with('(') {
+                format!("~({text})")
+            } else {
+                format!("~{text}")
+            }
+        } else {
+            format!("{}({text})", f.name(self.angle))
+        });
         self.last_was_op = false;
         self.inv = false;
         Ok(())

@@ -199,6 +199,9 @@ impl App {
                 ui.checkbox(&mut s.copy_locale_decimal, tr("prefs-copy-locale"));
                 ui.checkbox(&mut s.copy_grouping, tr("prefs-copy-grouping"));
                 ui.separator();
+                ui.strong(tr("prefs-programmer"));
+                ui.checkbox(&mut s.programmer_c_signs, tr("prefs-c-signs"));
+                ui.separator();
                 if ui.button(tr("prefs-open-folder")).clicked() {
                     crate::app::open_path(&calc_config::config_dir());
                 }
