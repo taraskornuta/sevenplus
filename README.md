@@ -125,7 +125,7 @@ The workspace has six crates:
 | `calc-ui` | The egui user interface. |
 | `calc-app` | The `sevenplus` binary: window, logging, crash reports and platform integration. |
 
-`calc-core` checks its results against key-sequence files in `crates/calc-core/tests/golden/`; see the comments there to add more. Packages are built by the GitHub Actions release workflow when a `v*` tag is pushed. `docs/srs-deviations.md` lists where the implementation deliberately differs from the requirements specification.
+`calc-core` checks its results against key-sequence files in `crates/calc-core/tests/golden/`; see the comments there to add more. To build installers (`.msi`, portable `.zip`, `.dmg`, `.deb`, `.rpm`) yourself, see [docs/packaging.md](docs/packaging.md). The GitHub Actions release workflow builds all of them when a `v*` tag is pushed. `docs/srs-deviations.md` lists where the implementation deliberately differs from the requirements specification.
 
 ## License
 
