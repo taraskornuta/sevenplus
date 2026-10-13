@@ -1,9 +1,11 @@
-//! The Win7 calculator state machine, shared by all four modes.
+//! The Win7 calculator state machine, shared by all four modes (ENG-008).
 //!
 //! Standard and Statistics use immediate execution (`2 + 3 * 4 = 20`); Scientific and
 //! Programmer honour operator precedence and parentheses (`2 + 3 * 4 = 14`).
+//! Programmer mode computes with 64-bit integers masked to the word size (ENG-005).
 
-use crate::number::{CalcError, CalcResult, Num, group};
+use crate::number::{CalcError, CalcResult, Num};
+use calc_format::{EntryText, FormatSettings, Locale, Notation, Value};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -67,18 +69,14 @@ impl WordSize {
         }
     }
 
-    fn mask(self) -> u128 {
-        (1u128 << self.bits()) - 1
+    pub fn mask(self) -> u64 {
+        u64::MAX >> (64 - self.bits())
     }
 
-    /// Truncates `v` to this word size and sign-extends it back.
-    pub fn wrap(self, v: i128) -> i128 {
-        let u = (v as u128) & self.mask();
-        if u >> (self.bits() - 1) & 1 == 1 {
-            u as i128 - (1i128 << self.bits())
-        } else {
-            u as i128
-        }
+    /// Truncates `v` to this word size and sign-extends it back (two's complement).
+    pub fn wrap(self, v: i64) -> i64 {
+        let shift = 64 - self.bits();
+        (v << shift) >> shift
     }
 }
 
@@ -200,6 +198,11 @@ impl Func {
             Func::RoR => "RoR".into(),
         }
     }
+
+    /// Functions available in Programmer mode.
+    fn integer(self) -> bool {
+        matches!(self, Func::Not | Func::RoL | Func::RoR)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -212,8 +215,9 @@ pub enum StatFn {
     StdDevN1,
 }
 
+/// A calculator key: every input the engine understands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Cmd {
+pub enum Key {
     Digit(u8),
     Point,
     Negate,
@@ -247,14 +251,43 @@ pub struct HistoryItem {
     pub result: Num,
 }
 
-/// Number currently being typed.
-#[derive(Debug, Clone, Default)]
-struct Entry {
-    neg: bool,
-    mant: String,
-    /// Exponent typed after `Exp`: (negative, digits).
-    exp: Option<(bool, String)>,
+/// Everything the display shows, before locale-specific formatting (ENG-008, ENG-010).
+#[derive(Debug, Clone, PartialEq)]
+pub struct DisplayState {
+    pub mode: Mode,
+    /// The current number: the typed entry's value or the last result.
+    pub value: Value,
+    /// The number being typed, if any, kept as text.
+    pub entry: Option<EntryText>,
+    /// Pending expression with `.` as decimal point, e.g. `12 + sqrt(9) -`.
+    pub expression: String,
+    pub error: Option<CalcError>,
+    pub memory: bool,
+    pub paren_depth: usize,
+    pub inv: bool,
+    /// Digits, notation and radix for this mode; the UI adds grouping.
+    pub format: FormatSettings,
 }
+
+impl DisplayState {
+    /// The main display text.
+    pub fn text(&self, grouping: bool, locale: &Locale) -> String {
+        if let Some(e) = self.error {
+            return e.to_string();
+        }
+        let s = FormatSettings {
+            grouping,
+            ..self.format
+        };
+        match &self.entry {
+            Some(e) => calc_format::format_entry(e, &s, locale),
+            None => calc_format::format(&self.value, &s, locale),
+        }
+    }
+}
+
+/// Digits requested from a number for display: enough to round 32 digits correctly.
+const DECIMAL_DIGITS: usize = 40;
 
 #[derive(Debug, Clone)]
 pub struct Calculator {
@@ -264,11 +297,10 @@ pub struct Calculator {
     pub word: WordSize,
     pub inv: bool,
     pub fe: bool,
-    pub grouping: bool,
     memory: Option<Num>,
     history: Vec<HistoryItem>,
     stats: Vec<Num>,
-    entry: Option<Entry>,
+    entry: Option<EntryText>,
     value: Num,
     /// Expression text of `value` when it came from a function, e.g. `sqrt(9)`.
     operand_text: Option<String>,
@@ -296,7 +328,6 @@ impl Calculator {
             word: WordSize::Qword,
             inv: false,
             fe: false,
-            grouping: false,
             memory: None,
             history: Vec::new(),
             stats: Vec::new(),
@@ -314,6 +345,7 @@ impl Calculator {
 
     // ---- queries -------------------------------------------------------------------
 
+    /// Significant digits shown: Win7 shows 32 in Scientific and 16 elsewhere.
     fn max_digits(&self) -> usize {
         if self.mode == Mode::Scientific {
             32
@@ -324,6 +356,24 @@ impl Calculator {
 
     fn precedence(&self) -> bool {
         matches!(self.mode, Mode::Scientific | Mode::Programmer)
+    }
+
+    /// Formatting settings of the current mode, without grouping.
+    pub fn format_settings(&self) -> FormatSettings {
+        FormatSettings {
+            max_digits: self.max_digits(),
+            notation: if self.fe {
+                Notation::Exponential
+            } else {
+                Notation::Auto
+            },
+            grouping: false,
+            radix: if self.mode == Mode::Programmer {
+                self.base.radix()
+            } else {
+                10
+            },
+        }
     }
 
     pub fn value(&self) -> Num {
@@ -362,78 +412,52 @@ impl Calculator {
         }
     }
 
+    /// Programmer-mode value as a sign-extended 64-bit integer.
+    fn int(&self, n: &Num) -> i64 {
+        self.word.wrap(n.to_i128() as i64)
+    }
+
     /// Current integer value in programmer mode, as raw bits.
     pub fn bits(&self) -> u64 {
-        (self.word.wrap(self.value().to_i128()) as u128 & self.word.mask()) as u64
+        (self.int(&self.value()) as u64) & self.word.mask()
     }
 
-    pub fn format_num(&self, n: &Num) -> String {
+    /// A number as a display value in the current mode.
+    pub fn to_value(&self, n: &Num) -> Value {
         if self.mode == Mode::Programmer {
-            return self.format_int(self.word.wrap(n.to_i128()));
-        }
-        n.format(self.max_digits(), self.fe, self.grouping)
-    }
-
-    fn format_int(&self, v: i128) -> String {
-        let (s, n, sep) = match self.base {
-            Base::Dec => (v.to_string(), 3, ','),
-            b => {
-                let u = (v as u128) & self.word.mask();
-                let s = match b {
-                    Base::Hex => format!("{u:X}"),
-                    Base::Oct => format!("{u:o}"),
-                    _ => format!("{u:b}"),
-                };
-                (s, if b == Base::Oct { 3 } else { 4 }, ' ')
+            Value::Int {
+                bits: self.int(n) as u64,
+                word: self.word.bits(),
             }
-        };
-        if !self.grouping {
-            return s;
-        }
-        match s.strip_prefix('-') {
-            Some(d) => format!("-{}", group(d, n, sep)),
-            None => group(&s, n, sep),
-        }
-    }
-
-    /// Main display text.
-    pub fn display(&self) -> String {
-        if let Some(e) = self.error {
-            return e.to_string();
-        }
-        let Some(entry) = &self.entry else {
-            return self.format_num(&self.value);
-        };
-        let mut s = String::new();
-        if entry.neg {
-            s.push('-');
-        }
-        let (int, frac) = match entry.mant.split_once('.') {
-            Some((i, f)) => (i, Some(f)),
-            None => (entry.mant.as_str(), None),
-        };
-        if self.grouping {
-            let (n, sep) = match (self.mode, self.base) {
-                (Mode::Programmer, Base::Hex | Base::Bin) => (4, ' '),
-                (Mode::Programmer, Base::Oct) => (3, ' '),
-                _ => (3, ','),
-            };
-            s.push_str(&group(int, n, sep));
         } else {
-            s.push_str(int);
+            Value::Dec(n.to_decimal(DECIMAL_DIGITS))
         }
-        if let Some(f) = frac {
-            s.push('.');
-            s.push_str(f);
+    }
+
+    /// Canonical text of a number (no grouping, `.` decimal point), as used in the
+    /// expression line and history.
+    pub fn format_num(&self, n: &Num) -> String {
+        calc_format::format(&self.to_value(n), &self.format_settings(), &Locale::EN_US)
+    }
+
+    /// Everything the display needs (ENG-008).
+    pub fn state(&self) -> DisplayState {
+        DisplayState {
+            mode: self.mode,
+            value: self.to_value(&self.value()),
+            entry: self.entry.clone(),
+            expression: self.expression(),
+            error: self.error,
+            memory: self.has_memory(),
+            paren_depth: self.paren_depth(),
+            inv: self.inv,
+            format: self.format_settings(),
         }
-        if let Some((neg, digits)) = &entry.exp {
-            if frac.is_none() {
-                s.push('.');
-            }
-            s.push_str(if *neg { "e-" } else { "e+" });
-            s.push_str(if digits.is_empty() { "0" } else { digits });
-        }
-        s
+    }
+
+    /// Main display text with default formatting (no grouping, en-US).
+    pub fn display(&self) -> String {
+        self.state().text(false, &Locale::EN_US)
     }
 
     /// Expression line shown above the display, e.g. `2 + sqrt(9) *`.
@@ -443,6 +467,40 @@ impl Calculator {
             parts.push(t.clone());
         }
         parts.join(" ").replace("( ", "(")
+    }
+
+    /// Whether a key does anything in the current state (disabled buttons, PRG-004,
+    /// ENG-006).
+    pub fn enabled(&self, key: Key) -> bool {
+        if self.error.is_some() {
+            return matches!(key, Key::Digit(_) | Key::Clear | Key::ClearEntry);
+        }
+        match self.mode {
+            Mode::Programmer => match key {
+                Key::Digit(n) => (n as u32) < self.base.radix(),
+                Key::Point | Key::Percent | Key::Pi | Key::Exp | Key::FE | Key::Inv => false,
+                Key::Stat(_) | Key::StatAdd | Key::StatClear => false,
+                Key::Op(op) => !matches!(op, BinOp::Pow | BinOp::Root),
+                Key::Func(f) => f.integer(),
+                Key::CloseParen => self.paren_depth() > 0,
+                _ => true,
+            },
+            mode => match key {
+                Key::Digit(n) => n < 10,
+                Key::ToggleBit(_) => false,
+                Key::Func(f) => !f.integer(),
+                Key::Op(op) => {
+                    matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div)
+                        || mode == Mode::Scientific
+                }
+                Key::OpenParen | Key::Exp | Key::Inv | Key::FE | Key::Pi => {
+                    mode == Mode::Scientific
+                }
+                Key::CloseParen => self.paren_depth() > 0,
+                Key::Stat(_) | Key::StatAdd | Key::StatClear => mode == Mode::Statistics,
+                _ => true,
+            },
+        }
     }
 
     // ---- settings ------------------------------------------------------------------
@@ -456,6 +514,8 @@ impl Calculator {
         self.inv = false;
     }
 
+    /// Switches mode. History is cleared (HIS-004); memory is kept, truncated to an
+    /// integer in Programmer mode (MEM-003).
     pub fn set_mode(&mut self, mode: Mode) {
         if self.mode == mode {
             return;
@@ -464,11 +524,12 @@ impl Calculator {
         self.reset_expression();
         self.error = None;
         self.repeat = None;
+        self.history.clear();
         self.mode = mode;
         if mode == Mode::Programmer {
-            self.value = Num::from_i128(self.word.wrap(self.value.to_i128()));
+            self.value = Num::from_i64(self.int(&self.value));
             if let Some(m) = &self.memory {
-                self.memory = Some(Num::from_i128(self.word.wrap(m.to_i128())));
+                self.memory = Some(Num::from_i64(self.int(m)));
             }
         }
     }
@@ -481,7 +542,9 @@ impl Calculator {
     pub fn set_word(&mut self, word: WordSize) {
         self.commit();
         self.word = word;
-        self.value = Num::from_i128(word.wrap(self.value.to_i128()));
+        if self.mode == Mode::Programmer {
+            self.value = Num::from_i64(self.int(&self.value));
+        }
     }
 
     /// Replaces the display value (history recall, paste, unit conversion…).
@@ -491,7 +554,7 @@ impl Calculator {
         self.operand_text = None;
         self.last_was_op = false;
         self.value = if self.mode == Mode::Programmer {
-            Num::from_i128(self.word.wrap(n.to_i128()))
+            Num::from_i64(self.int(&n))
         } else {
             n
         };
@@ -499,35 +562,44 @@ impl Calculator {
 
     // ---- input ---------------------------------------------------------------------
 
-    pub fn press(&mut self, cmd: Cmd) {
+    /// Applies one key and returns the new display state (ENG-008).
+    pub fn press(&mut self, key: Key) -> DisplayState {
+        self.apply_key(key);
+        self.state()
+    }
+
+    /// Applies one key without building a [`DisplayState`].
+    pub fn apply_key(&mut self, key: Key) {
         if self.error.is_some() {
-            match cmd {
-                Cmd::Clear | Cmd::ClearEntry => {}
-                Cmd::Digit(_) | Cmd::Point => self.press(Cmd::Clear),
+            // In an error state only C, CE and digits are accepted (ENG-006).
+            match key {
+                Key::Clear | Key::ClearEntry => {}
+                Key::Digit(_) => self.apply_key(Key::Clear),
                 _ => return,
             }
         }
-        if let Err(e) = self.dispatch(cmd) {
+        if let Err(e) = self.dispatch(key) {
             self.error = Some(e);
             self.entry = None;
             self.reset_expression();
         }
     }
 
-    fn dispatch(&mut self, cmd: Cmd) -> Result<(), CalcError> {
-        match cmd {
-            Cmd::Digit(d) => self.digit(d),
-            Cmd::Point => self.point(),
-            Cmd::Negate => self.negate()?,
-            Cmd::Back => self.back(),
-            Cmd::ClearEntry => {
+    fn dispatch(&mut self, key: Key) -> Result<(), CalcError> {
+        match key {
+            Key::Digit(d) => self.digit(d),
+            Key::Point => self.point(),
+            Key::Negate => self.negate()?,
+            Key::Back => self.back(),
+            Key::ClearEntry => {
                 self.error = None;
                 self.entry = None;
                 self.operand_text = None;
                 self.value = Num::zero();
             }
-            Cmd::Clear => {
-                let keep = (self.memory.take(), std::mem::take(&mut self.history));
+            Key::Clear => {
+                let memory = self.memory.take();
+                let history = std::mem::take(&mut self.history);
                 let stats = std::mem::take(&mut self.stats);
                 *self = Calculator {
                     mode: self.mode,
@@ -535,18 +607,20 @@ impl Calculator {
                     base: self.base,
                     word: self.word,
                     fe: self.fe,
-                    grouping: self.grouping,
-                    memory: keep.0,
-                    history: keep.1,
+                    memory,
+                    history,
                     stats,
                     ..Calculator::new()
                 };
             }
-            Cmd::Op(op) => self.binary(op)?,
-            Cmd::Equals => self.equals()?,
-            Cmd::Percent => self.percent()?,
-            Cmd::Func(f) => self.func(f)?,
-            Cmd::Pi => {
+            Key::Op(op) => self.binary(op)?,
+            Key::Equals => self.equals()?,
+            Key::Percent => self.percent()?,
+            Key::Func(f) => self.func(f)?,
+            Key::Pi => {
+                if self.mode == Mode::Programmer {
+                    return Ok(());
+                }
                 let pi = Num::pi();
                 let v = if self.inv {
                     pi.mul(&Num::from_i64(2))?
@@ -556,7 +630,10 @@ impl Calculator {
                 self.load_value(v);
                 self.inv = false;
             }
-            Cmd::OpenParen => {
+            Key::OpenParen => {
+                if !self.precedence() {
+                    return Ok(());
+                }
                 self.entry = None;
                 self.operand_text = None;
                 self.last_was_op = false;
@@ -564,58 +641,64 @@ impl Calculator {
                 self.paren_marks.push(self.tokens.len());
                 self.tokens.push("(".into());
             }
-            Cmd::CloseParen => self.close_paren()?,
-            Cmd::Exp => self.exp(),
-            Cmd::FE => {
-                self.commit();
-                self.fe = !self.fe;
+            Key::CloseParen => self.close_paren()?,
+            Key::Exp => self.exp(),
+            Key::FE => {
+                if self.mode != Mode::Programmer {
+                    self.commit();
+                    self.fe = !self.fe;
+                }
             }
-            Cmd::Inv => self.inv = !self.inv,
-            Cmd::MemClear => self.memory = None,
-            Cmd::MemRecall => {
+            Key::Inv => self.inv = !self.inv,
+            Key::MemClear => self.memory = None,
+            Key::MemRecall => {
                 if let Some(m) = self.memory.clone() {
                     self.load_value(m);
                 }
             }
-            Cmd::MemStore => {
+            Key::MemStore => {
                 self.commit();
                 self.memory = Some(self.value.clone());
             }
-            Cmd::MemAdd | Cmd::MemSub => {
+            Key::MemAdd | Key::MemSub => {
                 self.commit();
                 let m = self.memory.clone().unwrap_or_else(Num::zero);
-                let r = if cmd == Cmd::MemAdd {
-                    self.apply(&m, BinOp::Add, &self.value)?
+                let op = if key == Key::MemAdd {
+                    BinOp::Add
                 } else {
-                    self.apply(&m, BinOp::Sub, &self.value)?
+                    BinOp::Sub
                 };
-                self.memory = Some(r);
+                self.memory = Some(self.apply(&m, op, &self.value)?);
             }
-            Cmd::StatAdd => {
-                self.commit();
-                self.stats.push(self.value.clone());
-                self.value = Num::zero();
-                self.operand_text = None;
+            Key::StatAdd => {
+                if self.mode == Mode::Statistics {
+                    self.commit();
+                    self.stats.push(self.value.clone());
+                    self.value = Num::zero();
+                    self.operand_text = None;
+                }
             }
-            Cmd::StatClear => self.stats.clear(),
-            Cmd::Stat(f) => {
-                let v = self.stat(f)?;
-                self.load_value(v);
+            Key::StatClear => self.stats.clear(),
+            Key::Stat(f) => {
+                if self.mode == Mode::Statistics {
+                    let v = self.stat(f)?;
+                    self.load_value(v);
+                }
             }
-            Cmd::ToggleBit(i) => {
+            Key::ToggleBit(i) => {
                 if self.mode == Mode::Programmer && i < self.word.bits() {
-                    let v = self.word.wrap(self.value().to_i128() ^ (1i128 << i));
-                    self.load_value(Num::from_i128(v));
+                    let v = self.int(&self.value()) ^ (1i64 << i);
+                    self.load_value(Num::from_i64(v));
                 }
             }
         }
         Ok(())
     }
 
-    fn entry_value(&self, e: &Entry) -> Num {
+    fn entry_value(&self, e: &EntryText) -> Num {
         let n = if self.mode == Mode::Programmer {
-            let u = u128::from_str_radix(&e.mant, self.base.radix()).unwrap_or(0);
-            Num::from_i128(self.word.wrap(u as i128))
+            let u = u64::from_str_radix(&e.mant, self.base.radix()).unwrap_or(0);
+            Num::from_i64(self.word.wrap(u as i64))
         } else {
             let mut s = e.mant.clone();
             if let Some((neg, d)) = &e.exp {
@@ -635,7 +718,7 @@ impl Calculator {
         if let Some(e) = self.entry.take() {
             let v = self.entry_value(&e);
             self.value = if self.mode == Mode::Programmer {
-                Num::from_i128(self.word.wrap(v.to_i128()))
+                Num::from_i64(self.int(&v))
             } else {
                 v
             };
@@ -643,16 +726,15 @@ impl Calculator {
         }
     }
 
-    fn start_entry(&mut self) -> &mut Entry {
+    fn start_entry(&mut self) -> &mut EntryText {
         if self.entry.is_none() {
             self.operand_text = None;
             self.last_was_op = false;
-            self.entry = Some(Entry {
-                mant: "0".into(),
-                ..Entry::default()
-            });
         }
-        self.entry.as_mut().unwrap()
+        self.entry.get_or_insert_with(|| EntryText {
+            mant: "0".into(),
+            ..EntryText::default()
+        })
     }
 
     fn digit(&mut self, d: u8) {
@@ -669,9 +751,10 @@ impl Calculator {
         let word = self.word;
         let base = self.base;
         let e = self.start_entry();
-        let c = char::from_digit(d as u32, radix)
-            .unwrap()
-            .to_ascii_uppercase();
+        let Some(c) = char::from_digit(d as u32, radix) else {
+            return;
+        };
+        let c = c.to_ascii_uppercase();
         if let Some((_, digits)) = &mut e.exp {
             if digits.len() < 4 {
                 digits.push(c);
@@ -689,8 +772,9 @@ impl Calculator {
             } else {
                 word.mask()
             };
-            u128::from_str_radix(&candidate, radix).is_ok_and(|v| v <= limit)
+            u64::from_str_radix(&candidate, radix).is_ok_and(|v| v <= limit)
         } else {
+            // STD-008: further digits beyond the display width are ignored.
             let count = candidate
                 .trim_start_matches(['0', '.'])
                 .chars()
@@ -718,13 +802,13 @@ impl Calculator {
             return;
         }
         if self.entry.is_none() {
-            let s = self.value.format(32, false, false);
+            let s = self.format_num(&self.value);
             let (mant, exp) = match s.split_once('e') {
                 Some((m, x)) => (m.trim_end_matches('.').to_string(), Some(x.to_string())),
                 None => (s, None),
             };
             let neg = mant.starts_with('-');
-            self.entry = Some(Entry {
+            self.entry = Some(EntryText {
                 neg,
                 mant: mant.trim_start_matches('-').to_string(),
                 exp: exp.map(|x| {
@@ -736,8 +820,9 @@ impl Calculator {
             });
             self.operand_text = None;
         }
-        let e = self.entry.as_mut().unwrap();
-        if e.exp.is_none() {
+        if let Some(e) = self.entry.as_mut()
+            && e.exp.is_none()
+        {
             e.exp = Some((false, String::new()));
         }
     }
@@ -754,17 +839,17 @@ impl Calculator {
         }
         self.commit();
         let text = self.operand_text();
-        let v = if self.mode == Mode::Programmer {
-            Num::from_i128(self.word.wrap(-self.value.to_i128()))
+        self.value = if self.mode == Mode::Programmer {
+            Num::from_i64(self.word.wrap(self.int(&self.value).wrapping_neg()))
         } else {
             self.value.neg()
         };
-        self.value = v;
         self.operand_text = Some(format!("negate({text})"));
         self.last_was_op = false;
         Ok(())
     }
 
+    /// STD-007: deletes the last typed digit; no effect on a computed result.
     fn back(&mut self) {
         let Some(e) = &mut self.entry else { return };
         match &mut e.exp {
@@ -789,11 +874,16 @@ impl Calculator {
     }
 
     fn binary(&mut self, op: BinOp) -> Result<(), CalcError> {
+        if !self.enabled(Key::Op(op)) {
+            return Ok(());
+        }
         if self.last_was_op {
-            // Pressing another operator replaces the pending one.
+            // Pressing another operator replaces the pending one (STD-002).
             if let Some(last) = self.levels.last_mut().and_then(|l| l.last_mut()) {
                 last.1 = op;
-                *self.tokens.last_mut().unwrap() = op.symbol().into();
+                if let Some(t) = self.tokens.last_mut() {
+                    *t = op.symbol().into();
+                }
                 return Ok(());
             }
         }
@@ -801,17 +891,18 @@ impl Calculator {
         let text = self.operand_text();
         let mut v = self.value.clone();
         let immediate = !self.precedence();
-        loop {
-            let top = self.levels.last_mut().unwrap();
+        while let Some(top) = self.levels.last_mut() {
             match top.last() {
                 Some((_, pop)) if immediate || pop.prec() >= op.prec() => {
-                    let (lhs, pop) = top.pop().unwrap();
+                    let Some((lhs, pop)) = top.pop() else { break };
                     v = self.apply(&lhs, pop, &v)?;
                 }
                 _ => break,
             }
         }
-        self.levels.last_mut().unwrap().push((v.clone(), op));
+        if let Some(top) = self.levels.last_mut() {
+            top.push((v.clone(), op));
+        }
         self.value = v;
         self.operand_text = None;
         self.tokens.push(text);
@@ -823,7 +914,7 @@ impl Calculator {
     /// Reduces the innermost level completely, returning the last applied operation.
     fn reduce_level(&mut self, mut v: Num) -> Result<(Num, Option<(BinOp, Num)>), CalcError> {
         let mut last = None;
-        while let Some((lhs, op)) = self.levels.last_mut().unwrap().pop() {
+        while let Some((lhs, op)) = self.levels.last_mut().and_then(|l| l.pop()) {
             last = Some((op, v.clone()));
             v = self.apply(&lhs, op, &v)?;
         }
@@ -831,14 +922,14 @@ impl Calculator {
     }
 
     fn close_paren(&mut self) -> Result<(), CalcError> {
-        if self.paren_marks.is_empty() {
+        let Some(&mark) = self.paren_marks.last() else {
             return Ok(());
-        }
+        };
         self.commit();
         let text = self.operand_text();
         let (v, _) = self.reduce_level(self.value.clone())?;
         self.levels.pop();
-        let mark = self.paren_marks.pop().unwrap();
+        self.paren_marks.pop();
         let inner: Vec<String> = self.tokens.drain(mark..).skip(1).collect();
         let body = if inner.is_empty() {
             text
@@ -855,6 +946,7 @@ impl Calculator {
         self.commit();
         let pending = self.levels.iter().any(|l| !l.is_empty());
         if !pending {
+            // STD-003: repeated `=` repeats the last operation.
             if let Some((op, rhs)) = self.repeat.clone() {
                 let expr = format!(
                     "{} {} {}",
@@ -890,13 +982,19 @@ impl Calculator {
     }
 
     fn push_history(&mut self, expr: String) {
-        self.history.push(HistoryItem {
-            expr,
-            result: self.value.clone(),
-        });
+        if matches!(self.mode, Mode::Standard | Mode::Scientific) {
+            self.history.push(HistoryItem {
+                expr,
+                result: self.value.clone(),
+            });
+        }
     }
 
+    /// STD-004: `left × entry / 100`; 0 without a pending operator.
     fn percent(&mut self) -> Result<(), CalcError> {
+        if self.mode == Mode::Programmer {
+            return Ok(());
+        }
         self.commit();
         let lhs = self
             .levels
@@ -910,6 +1008,9 @@ impl Calculator {
     }
 
     fn func(&mut self, f: Func) -> Result<(), CalcError> {
+        if !self.enabled(Key::Func(f)) {
+            return Ok(());
+        }
         self.commit();
         let text = self.operand_text();
         self.value = self.apply_func(f, &self.value)?;
@@ -922,8 +1023,8 @@ impl Calculator {
     fn apply(&self, a: &Num, op: BinOp, b: &Num) -> CalcResult {
         if self.mode == Mode::Programmer {
             return self
-                .apply_int(a.to_i128(), op, b.to_i128())
-                .map(Num::from_i128);
+                .apply_int(self.int(a), op, self.int(b))
+                .map(Num::from_i64);
         }
         match op {
             BinOp::Add => a.add(b),
@@ -937,8 +1038,9 @@ impl Calculator {
         }
     }
 
-    fn apply_int(&self, a: i128, op: BinOp, b: i128) -> Result<i128, CalcError> {
-        let shift = b.clamp(0, 127) as u32;
+    /// Fixed-width integer arithmetic, wrapping at the word size (PRG-003, PRG-006).
+    fn apply_int(&self, a: i64, op: BinOp, b: i64) -> Result<i64, CalcError> {
+        let shift = b.clamp(0, 64) as u32;
         let r = match op {
             BinOp::Add => a.wrapping_add(b),
             BinOp::Sub => a.wrapping_sub(b),
@@ -950,23 +1052,26 @@ impl Calculator {
                     CalcError::DivideByZero
                 });
             }
+            // Integer division truncates toward zero.
             BinOp::Div => a.wrapping_div(b),
             BinOp::Mod => a.wrapping_rem(b),
             BinOp::And => a & b,
             BinOp::Or => a | b,
             BinOp::Xor => a ^ b,
             BinOp::Lsh => a.checked_shl(shift).unwrap_or(0),
-            BinOp::Rsh => a >> shift,
+            BinOp::Rsh => a.checked_shr(shift).unwrap_or(if a < 0 { -1 } else { 0 }),
             BinOp::Pow | BinOp::Root => return Err(CalcError::InvalidInput),
         };
         Ok(self.word.wrap(r))
     }
 
     fn to_radians(&self, x: &Num) -> CalcResult {
+        // Reduce whole turns first: exact for exact angles, and fast for huge ones.
+        let turn = |t: i64| x.rem(&Num::from_i64(t));
         match self.angle {
             Angle::Radians => Ok(x.clone()),
-            Angle::Degrees => x.mul(&Num::pi())?.div(&Num::from_i64(180)),
-            Angle::Gradians => x.mul(&Num::pi())?.div(&Num::from_i64(200)),
+            Angle::Degrees => turn(360)?.mul(&Num::pi())?.div(&Num::from_i64(180)),
+            Angle::Gradians => turn(400)?.mul(&Num::pi())?.div(&Num::from_i64(200)),
         }
     }
 
@@ -978,27 +1083,58 @@ impl Calculator {
         }
     }
 
-    /// sin/cos/tan, exact at multiples of a right angle in degrees and gradians.
-    fn trig(&self, f: Func, x: &Num) -> CalcResult {
-        let quarter = match self.angle {
-            Angle::Degrees => Some(90),
-            Angle::Gradians => Some(100),
-            Angle::Radians => None,
+    /// Exact degrees for an exact angle in degrees or gradians, reduced to [0, 360).
+    fn exact_degrees(&self, x: &Num) -> Option<i64> {
+        let deg = match self.angle {
+            Angle::Degrees => x.clone(),
+            Angle::Gradians => x
+                .mul(&Num::from_i64(9))
+                .ok()?
+                .div(&Num::from_i64(10))
+                .ok()?,
+            Angle::Radians => return None,
         };
-        if let Some(q) = quarter {
-            let k = x.div(&Num::from_i64(q))?;
-            if k.is_int() {
-                let k = k.to_i128().rem_euclid(4) as usize;
-                let one = Num::from_i64(1);
-                return match f {
-                    Func::Sin => Ok([Num::zero(), one.clone(), Num::zero(), one.neg()][k].clone()),
-                    Func::Cos => Ok([one.clone(), Num::zero(), one.neg(), Num::zero()][k].clone()),
-                    _ if k % 2 == 1 => Err(CalcError::InvalidInput),
-                    _ => Ok(Num::zero()),
-                };
+        if !deg.is_exact() || !deg.is_int() {
+            return None;
+        }
+        // Reduce modulo 360 without overflowing for huge integers.
+        let r = deg.rem(&Num::from_i64(360)).ok()?.to_i128() as i64;
+        Some(r.rem_euclid(360))
+    }
+
+    /// sin/cos/tan with exact results where the value is rational (ENG-004).
+    fn trig(&self, f: Func, x: &Num) -> CalcResult {
+        if let Some(d) = self.exact_degrees(x) {
+            let half = || Num::one().div(&Num::from_i64(2));
+            let sin_of = |d: i64| -> Option<CalcResult> {
+                Some(match d {
+                    0 | 180 => Ok(Num::zero()),
+                    90 => Ok(Num::one()),
+                    270 => Ok(Num::one().neg()),
+                    30 | 150 => half(),
+                    210 | 330 => half().map(|h| h.neg()),
+                    _ => return None,
+                })
+            };
+            let exact = match f {
+                Func::Sin => sin_of(d),
+                Func::Cos => sin_of((d + 90) % 360),
+                _ => match d % 180 {
+                    0 => Some(Ok(Num::zero())),
+                    45 => Some(Ok(Num::one())),
+                    135 => Some(Ok(Num::one().neg())),
+                    90 => Some(Err(CalcError::InvalidInput)),
+                    _ => None,
+                },
+            };
+            if let Some(r) = exact {
+                return r;
             }
         }
-        let r = self.to_radians(x)?;
+        let r = match self.angle {
+            Angle::Radians => x.reduce_turns()?,
+            _ => self.to_radians(x)?,
+        };
         match f {
             Func::Sin => r.sin(),
             Func::Cos => r.cos(),
@@ -1006,19 +1142,57 @@ impl Calculator {
         }
     }
 
+    /// Inverse trig with exact angles for the rational values of [`Self::trig`].
+    fn inverse_trig(&self, f: Func, x: &Num) -> CalcResult {
+        if self.angle != Angle::Radians && x.is_exact() {
+            let two = Num::from_i64(2);
+            let key = x.mul(&two)?; // 2x: exact table lookup on halves
+            let k = key.is_int().then(|| key.to_i128());
+            let deg = match (f, k) {
+                (Func::Asin, Some(-2)) => Some(-90),
+                (Func::Asin, Some(-1)) => Some(-30),
+                (Func::Asin, Some(0)) => Some(0),
+                (Func::Asin, Some(1)) => Some(30),
+                (Func::Asin, Some(2)) => Some(90),
+                (Func::Acos, Some(-2)) => Some(180),
+                (Func::Acos, Some(-1)) => Some(120),
+                (Func::Acos, Some(0)) => Some(90),
+                (Func::Acos, Some(1)) => Some(60),
+                (Func::Acos, Some(2)) => Some(0),
+                (Func::Atan, Some(-2)) => Some(-45),
+                (Func::Atan, Some(0)) => Some(0),
+                (Func::Atan, Some(2)) => Some(45),
+                _ => None,
+            };
+            if let Some(d) = deg {
+                let d = Num::from_i64(d);
+                return match self.angle {
+                    Angle::Gradians => d.mul(&Num::from_i64(10))?.div(&Num::from_i64(9)),
+                    _ => Ok(d),
+                };
+            }
+        }
+        let r = match f {
+            Func::Asin => x.asin()?,
+            Func::Acos => x.acos()?,
+            _ => x.atan()?,
+        };
+        self.radians_to_angle(r)
+    }
+
     fn apply_func(&self, f: Func, x: &Num) -> CalcResult {
-        let one = Num::from_i64(1);
+        let one = Num::one();
         if self.mode == Mode::Programmer {
-            let v = x.to_i128();
+            let v = self.int(x);
             let bits = self.word.bits();
-            let u = (v as u128) & self.word.mask();
+            let u = (v as u64) & self.word.mask();
             let r = match f {
                 Func::Not => !v,
-                Func::RoL => ((u << 1) | (u >> (bits - 1))) as i128,
-                Func::RoR => ((u >> 1) | ((u & 1) << (bits - 1))) as i128,
+                Func::RoL => ((u << 1) | (u >> (bits - 1))) as i64,
+                Func::RoR => ((u >> 1) | ((u & 1) << (bits - 1))) as i64,
                 _ => return Err(CalcError::InvalidInput),
             };
-            return Ok(Num::from_i128(self.word.wrap(r)));
+            return Ok(Num::from_i64(self.word.wrap(r)));
         }
         match f {
             Func::Sqrt => x.sqrt(),
@@ -1031,9 +1205,7 @@ impl Calculator {
             Func::Ln => x.ln(),
             Func::Log => x.log10(),
             Func::Sin | Func::Cos | Func::Tan => self.trig(f, x),
-            Func::Asin => self.radians_to_angle(x.asin()?),
-            Func::Acos => self.radians_to_angle(x.acos()?),
-            Func::Atan => self.radians_to_angle(x.atan()?),
+            Func::Asin | Func::Acos | Func::Atan => self.inverse_trig(f, x),
             Func::Sinh => x.sinh(),
             Func::Cosh => x.cosh(),
             Func::Tanh => x.tanh(),
@@ -1073,6 +1245,7 @@ impl Calculator {
             .stats
             .iter()
             .try_fold(Num::zero(), |a, x| a.add(&x.mul(x)?))?;
+        // STA-004: functions over an empty list report an error instead of crashing.
         let need = |k: usize| {
             if self.stats.len() < k {
                 Err(CalcError::InvalidInput)
@@ -1100,7 +1273,7 @@ impl Calculator {
                 let d = if f == StatFn::StdDevN {
                     n
                 } else {
-                    n.sub(&Num::from_i64(1))?
+                    n.sub(&Num::one())?
                 };
                 let var = ss.div(&d)?;
                 if var.compare(&Num::zero()) == Ordering::Less {

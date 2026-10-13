@@ -1,107 +1,130 @@
-# SevenPlus
+# SevenPlus Calculator
 
-A Windows 7 calculator clone written in Rust, with the same functions and look. You can change the theme, and every colour, size and font is set in a TOML file.
+A desktop calculator written in Rust that works the way the Windows 7 Calculator did: the same four modes, the same keys and shortcuts, and the same answers. It runs on Windows, macOS and Linux, stays sharp at any display scale and can be themed with plain TOML files.
 
-Runs on Linux (.deb, .rpm), Windows and macOS.
+SevenPlus is an independent project inspired by the Windows 7 Calculator. It contains no Microsoft code, artwork or fonts.
+
+![Standard mode](docs/screenshots/standard.png)
 
 ## Features
 
-- **Standard**: immediate execution (`2 + 3 * 4 = 20`), memory (MC MR MS M+ M-), `%`, `√`, `1/x`, `±`. Pressing `=` again repeats the last operation.
-- **Scientific**: operator precedence (`2 + 3 * 4 = 14`) and parentheses. Also Inv, Degrees/Radians/Grads, trig and hyperbolic functions, `ln`, `log`, `xʸ`, `ʸ√x`, `n!` (gamma for non-integers), `dms`, `F-E`, `Exp`, `Mod`, `Int`/`Frac` and π. Results show 32 significant digits.
-- **Programmer**: Hex, Dec, Oct and Bin bases with Qword, Dword, Word and Byte word sizes. Operators: And, Or, Xor, Not, Lsh, Rsh, RoL, RoR and Mod. The 64-bit binary panel has clickable bits.
-- **Statistics**: a data list with x̄, x̄², Σx, Σx², σn and σn-1. Right-click a value to delete it.
-- **History** (Ctrl+H), **Digit grouping**, **Copy/Paste**.
-- **Unit conversion** (Ctrl+U), **Date calculation** (Ctrl+E), and **Worksheets**: mortgage, vehicle lease, fuel economy in mpg and L/100 km.
-- Window frame: native OS frame, or a hand-drawn Windows 7 **Aero glass** frame.
-- **Resizable**: drag a corner or edge and the whole UI scales uniformly, keeping the Win7 proportions. The scale is remembered (`scale` in `settings.toml`), and **View ▸ Reset size** returns to 100%. The Aero frame has its own resize grip in the bottom-right corner.
+### Standard mode
 
-## Keyboard
+Operations run as you type, left to right: `2 + 3 * 4 =` gives 20, as on a pocket calculator.
 
-| Key | Action | Key | Action |
-|---|---|---|---|
-| Alt+1…4 | Standard / Scientific / Programmer / Statistics | Ctrl+H | History |
-| Enter, `=` | Equals | Esc | C |
-| Del | CE | Backspace | ← |
-| F9 | ± | `@` | √ |
-| `r` | 1/x | `%` | % (Standard) / Mod |
-| Ctrl+M / R / L / P / Q | MS / MR / MC / M+ / M- | Ctrl+C / Ctrl+V | Copy / Paste |
-| `i` | Inv | `( )` | Parentheses |
-| `s` `o` `t` | sin cos tan | `n` `l` `g` | ln log 10ˣ |
-| `q` `#` `y` `!` | x² x³ xʸ n! | `p` `m` `v` `x` `;` | π dms F-E Exp Int |
-| F3 / F4 / F5 | Degrees / Radians / Grads (Scientific) | | |
-| F5–F8 | Hex / Dec / Oct / Bin (Programmer) | F12, F2–F4 | Qword / Dword / Word / Byte |
-| `& \| ^ < > ~` | And Or Xor Lsh Rsh Not | `j` `k` | RoL RoR |
-| Insert, `a` | Add (Statistics) | Ctrl+U / Ctrl+E / Ctrl+F4 | Units / Dates / Basic |
+- Memory keys `MC MR MS M+ M-`. An **M** in the display shows that memory is set.
+- `%` works on the pending operation: `50 + 10 % =` gives 55.
+- `√`, `1/x` and `±` act on the current number and show up in the expression line, e.g. `sqrt(9)`.
+- Pressing `=` again repeats the last operation: `2 + 3 = =` gives 8.
+- **History** (`Ctrl+H`) lists finished calculations. Click one to reuse its result.
+- **Digit grouping** (View menu) shows `1,234,567.5`, using your system's separators.
 
-## Themes and settings
+Arithmetic is exact. `0.1 + 0.2` is `0.3` and `1 / 3 * 3` is `1`, because numbers are kept as exact fractions until a function like `sin` or `ln` needs an approximation. Results show 16 significant digits, rounded half to even.
 
-The settings live in the per-user config folder:
+### Scientific mode
 
-| OS | Folder |
+![Scientific mode](docs/screenshots/scientific.png)
+
+- Normal operator precedence (`2 + 3 * 4 = 14`) and nested parentheses. The `(=n` indicator counts open brackets.
+- Degrees, radians and grads. Exact angles give exact answers: `sin 30° = 0.5`, `tan 45° = 1`, `cos 90° = 0`.
+- Trigonometric and hyperbolic functions and their inverses (`Inv`), `ln`, `log`, `eˣ`, `10ˣ`, `x²`, `x³`, `xʸ`, `ʸ√x`, `∛x`, `n!` (the gamma function for non-integers), `π`, `Mod`, `Int`/`Frac`, `dms`/`deg`, `Exp` and `F-E`.
+- Results show 32 significant digits and are accurate to the last of them.
+
+### Programmer mode
+
+![Programmer mode](docs/screenshots/programmer.png)
+
+- Hex, Dec, Oct and Bin with Qword, Dword, Word and Byte word sizes. Values are two's-complement and wrap at the word size, just like integers in a program.
+- `And`, `Or`, `Xor`, `Not`, `Lsh`, `Rsh`, `RoL`, `RoR`, `Mod`, and integer division that truncates toward zero.
+- Keys that don't fit the current base are disabled. The 64-bit panel shows every bit; click a bit to flip it.
+
+### Statistics mode
+
+![Statistics mode](docs/screenshots/statistics.png)
+
+Type a value and press `Add` (or `Insert`). The list shows the data and `Count = n`. Available results: mean `x̄`, mean of squares `x̄²`, `Σx`, `Σx²`, and the population and sample standard deviations `σn` and `σn-1`. To delete one value, select it and press `C`. `CAD` clears all values.
+
+### Unit conversion, date calculation and worksheets
+
+| Unit conversion (`Ctrl+U`) | Date calculation (`Ctrl+E`) | Worksheets |
+|---|---|---|
+| ![Unit conversion](docs/screenshots/units.png) | ![Date calculation](docs/screenshots/date.png) | ![Mortgage worksheet](docs/screenshots/mortgage.png) |
+
+These panels open beside the keypad, and the window grows to fit them:
+
+- **Unit conversion** covers angle, area, energy, length, power, pressure, temperature, time, velocity, volume and weight/mass. Conversion factors are checked against NIST SP 811.
+- **Date calculation** gives the difference between two dates in years, months, weeks and days, or adds or subtracts a span from a date.
+- **Worksheets** are for mortgage, vehicle lease and fuel economy (mpg and L/100 km). Fill in all fields but one and the worksheet solves for it.
+
+`Ctrl+F4` returns to the basic view.
+
+### Themes
+
+![Dark, Classic, Light and High Contrast themes](docs/screenshots/themes.png)
+
+Five themes are built in: **Aero 7** (the default glass-blue look), **Classic**, **Light**, **Dark** and **High Contrast**. By default the calculator follows your system's light/dark setting, and it switches to High Contrast when the system's high-contrast mode is on. Switching themes takes effect immediately, without losing your calculation.
+
+Every color, size and font is a token in a TOML file, and you can add your own themes without rebuilding anything. See [docs/themes.md](docs/themes.md).
+
+### Everything else
+
+- **Keyboard first.** Every key has a shortcut. Tab moves through the buttons in reading order, and Enter or Space presses the focused one. The full list is in [docs/keyboard.md](docs/keyboard.md).
+- **Copy and paste.** Paste a number, or a simple expression like `(2+3)*4`, and it is typed for you.
+- **Screen readers.** Every button has a name, and new results are announced (NVDA, VoiceOver and Orca, through AccessKit).
+- **Sharp at any scale.** The calculator supports per-monitor DPI from 100% to 300%, including fractional scales. Move it to another monitor and it re-renders at that scale. Drag a corner to zoom the whole calculator, or use `Ctrl +`, `Ctrl -` and `Ctrl 0`.
+- **Remembers where you left it.** Window position, mode, open panel, digit grouping and theme are restored at the next start.
+- **Window frame.** Use the native OS frame, or a hand-drawn Aero glass frame (View ▸ Window frame).
+- **Private.** The calculator works offline, with no network access and no telemetry.
+
+## Install
+
+Download the package for your system from the [releases page](https://github.com/taraskornuta/sevenplus/releases):
+
+| System | Package |
 |---|---|
-| Linux | `~/.config/sevenplus/` |
-| Windows | `%APPDATA%\sevenplus\config\` |
-| macOS | `~/Library/Application Support/sevenplus/` |
+| Windows 11 (x64, ARM64) | `.msi` installer (per-user or per-machine), or a portable `.zip` |
+| macOS 12+ (Apple silicon and Intel) | `.dmg` |
+| Debian 12+, Ubuntu 22.04+ (amd64, arm64) | `.deb` |
+| Fedora 39+, RHEL 9, openSUSE Leap 15.5 (x86_64, aarch64) | `.rpm` |
 
-- `settings.toml` holds the active theme, the window frame (`frame = "native"` or `"aero"`), the UI `scale`, the mode, history and other options. The app saves it automatically.
-- `themes/*.toml` are the theme files. `win7.toml` and `win7-dark.toml` are written there on first run.
+On Linux it runs under both Wayland and X11. Each release also has a `SHA256SUMS` file.
 
-To make your own theme, copy `win7.toml` to a new file name and edit it. Then select it under **View ▸ Theme**. The same menu has **Open themes folder**.
+## Settings and files
 
-The built-in Windows 7 theme is the base layer, so a theme only needs the keys it changes:
+| What | Linux | macOS | Windows |
+|---|---|---|---|
+| Settings | `~/.config/sevenplus/settings.toml` | `~/Library/Application Support/sevenplus/settings.toml` | `%APPDATA%\sevenplus\config\settings.toml` |
+| User themes | `~/.config/sevenplus/themes/` | `~/Library/Application Support/sevenplus/themes/` | `%APPDATA%\sevenplus\themes\` |
+| Logs and crash reports | `~/.local/state/sevenplus/` | `~/Library/Logs/sevenplus/` | `%LOCALAPPDATA%\sevenplus\data\logs\` |
 
-```toml
-name = "My theme"
-
-[button.hover]
-gradient = ["#e0f0ff", "#a8d0f8"]
-
-[button.equals]          # groups: digit, operator, memory, function, equals
-gradient = ["#5d8fd6", "#2f63b0"]
-text = "#ffffff"
-
-[font]
-file = "MyFont.ttf"      # relative to the themes folder
-```
-
-- **Colours** are `"#rrggbb"` or `"#rrggbbaa"`.
-- **Gradients** are lists of colours spread evenly from top to bottom.
-- **Sizes** are in logical pixels, covering button size, gap and corner radius, display height and font sizes, padding and title bar sizes.
-- **Live reload**: changes to the active theme file apply while the app runs.
-- **Errors**: a typo or invalid colour shows an error banner and the previous theme stays active.
-
-`win7.toml` documents every key.
+Most options are under **Edit ▸ Preferences** (`Ctrl+,`): theme, decimal and group separators, and copy format. The calculator saves settings itself. If the settings file is ever damaged, it is renamed to `settings.toml.bak` and the defaults are used. Set `RUST_LOG=info` for more detailed logs.
 
 ## Building
 
-```sh
-cargo run --release -p sevenplus
-cargo test --workspace
-```
-
-On Debian/Ubuntu, install the GUI build dependencies first:
+You need Rust. The pinned version in `rust-toolchain.toml` is installed automatically. On Linux, also install the X11/Wayland development headers (`libxkbcommon-dev`, `libwayland-dev`).
 
 ```sh
-sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libgl1-mesa-dev
+cargo run --release                        # build and start the calculator
+cargo test --workspace                     # all tests, including the golden key sequences
+cargo test --release -p calc-core --test perf
+cargo clippy --workspace --all-targets -- -D warnings
+cargo deny check                           # licenses, advisories, banned crates
+cargo +nightly fuzz run keys               # fuzz the engine (needs cargo-fuzz)
 ```
 
-### Packages
+The workspace has six crates:
 
-| Target | Command | Output |
-|---|---|---|
-| .deb | `cargo build --release -p sevenplus && cargo deb -p sevenplus --no-build` | `target/debian/` |
-| .rpm | `cargo build --release -p sevenplus && cargo generate-rpm -p crates/sevenplus` | `target/generate-rpm/` |
-| macOS .app/.dmg | `cargo packager -p sevenplus --release --formats app,dmg` | `target/packages/` |
-| Windows installer | `cargo packager -p sevenplus --release --formats nsis` | `target/packages/` |
+| Crate | Purpose |
+|---|---|
+| `calc-core` | The calculator engine: a pure state machine (`press(key) -> DisplayState`) with exact rational arithmetic. It has no UI or OS dependencies. |
+| `calc-format` | Display formatting: rounding, notation, digit grouping and locale separators. |
+| `calc-theme` | Theme files: the TOML schema, inheritance and validation. |
+| `calc-config` | Settings and per-OS folders, with atomic saves. |
+| `calc-ui` | The egui user interface. |
+| `calc-app` | The `sevenplus` binary: window, logging, crash reports and platform integration. |
 
-Install the tools with `cargo install cargo-deb cargo-generate-rpm cargo-packager`.
+`calc-core` checks its results against key-sequence files in `crates/calc-core/tests/golden/`; see the comments there to add more. Packages are built by the GitHub Actions release workflow when a `v*` tag is pushed. `docs/srs-deviations.md` lists where the implementation deliberately differs from the requirements specification.
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds the .deb, .rpm, a universal macOS .dmg, a Windows installer and a portable zip, then attaches them to a GitHub release.
+## License
 
-## Project layout
-
-- `crates/calc-core`: the calculator engine, with no GUI. It covers all modes, 256-bit floating-point arithmetic, Win7 number formatting, unit conversion, date calculation and worksheets, and is unit-tested.
-- `crates/sevenplus`: the egui application. It contains the theme loader, the drawing code, the mode layouts and the extras panel.
-- `assets/`: the built-in themes, the Selawik font and the icons.
-
-Selawik is Microsoft's open-source substitute for Segoe UI, licensed under SIL OFL 1.1 (see `assets/fonts/Selawik-LICENSE.txt`). Segoe UI itself can't be redistributed. To use it on Windows, set `font.file` in a theme to `C:/Windows/Fonts/segoeui.ttf`.
+MIT. The bundled Inter font is under the SIL Open Font License 1.1. Third-party licenses are listed in Help ▸ Licenses.

@@ -1,0 +1,31 @@
+[package]
+name = "calc-ui"
+description = "egui user interface of the SevenPlus calculator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+calc-config.workspace = true
+calc-core.workspace = true
+calc-format.workspace = true
+calc-theme.workspace = true
+chrono.workspace = true
+eframe.workspace = true
+egui_extras = { version = "0.36", default-features = false, features = ["datepicker", "file", "svg"] }
+fluent-bundle = "0.16"
+image = { version = "0.25", default-features = false, features = ["png"], optional = true }
+jiff = { version = "0.2.38", default-features = false }
+toml.workspace = true
+tracing.workspace = true
+unic-langid = { version = "0.9", features = ["macros"] }
+
+[features]
+# Dev aid: SEVENPLUS_SCREENSHOT=out.png saves the first frames to a PNG and exits.
+screenshot = ["dep:image"]
+
+[lints]
+workspace = true

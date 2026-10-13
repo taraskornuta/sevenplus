@@ -1,0 +1,18 @@
+SevenPlus Calculator uses the following open-source components.
+
+Bundled font: Inter, Copyright (c) 2016 The Inter Project Authors,
+SIL Open Font License 1.1.
+
+{{#each overview}}
+{{{name}}}: {{count}} crate(s)
+{{/each}}
+
+{{#each licenses}}
+========================================================================
+{{{name}}}
+Used by: {{#each used_by}}{{crate.name}} {{crate.version}}{{#unless @last}}, {{/unless}}{{/each}}
+========================================================================
+
+{{{text}}}
+
+{{/each}}

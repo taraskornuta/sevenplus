@@ -1,0 +1,14 @@
+sevenplus (0.2.0-1) unstable; urgency=medium
+
+  * Exact rational arithmetic, half-to-even display rounding.
+  * Five built-in themes with inheritance; user themes in TOML.
+  * Accessibility: screen-reader names, keyboard focus, high contrast.
+  * Per-monitor DPI, window position memory, crash reports and logging.
+
+ -- Taras Kornuta <taraskornuta@gmail.com>  Tue, 13 Oct 2026 12:00:00 +0000
+
+sevenplus (0.1.0-1) unstable; urgency=medium
+
+  * Initial release.
+
+ -- Taras Kornuta <taraskornuta@gmail.com>  Mon, 12 Oct 2026 12:00:00 +0000

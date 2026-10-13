@@ -1,0 +1,104 @@
+# SevenPlus theme: High Contrast
+# White on black with yellow focus and hover, for low vision and the OS high-contrast
+# setting (UI-024).
+
+schema = 1
+name = "High Contrast"
+extends = "classic"
+
+[font.button]
+size = 14.0
+weight = "bold"
+[font.display]
+size = 24.0
+weight = "bold"
+
+[window]
+background = "#000000"
+
+[menu]
+background = "#000000"
+text = "#ffffff"
+hover = "#1aebff"
+hover_border = "#ffffff"
+popup_background = "#000000"
+popup_border = "#ffffff"
+
+[titlebar]
+background = "#000000"
+border = "#ffffff"
+inner_border = "#ffffff"
+text = "#ffffff"
+text_glow = "#00000000"
+button = "#000000"
+button_hover = "#1aebff"
+button_border = "#ffffff"
+close = "#000000"
+close_hover = "#ffff00"
+glyph = "#ffffff"
+glyph_outline = "#000000"
+glyph_disabled = "#808080"
+
+[display]
+background = "#000000"
+border = "#ffffff"
+text = "#ffffff"
+expression = "#ffffff"
+indicator = "#ffff00"
+history_text = "#ffffff"
+history_hover = "#333333"
+selection = "#1aebff"
+selection_text = "#000000"
+
+[button]
+radius = 0.0
+
+[button.default.normal]
+fill = "#000000"
+border = "#ffffff"
+highlight = "#00000000"
+text = "#ffffff"
+
+[button.default.hover]
+fill = "#1aebff"
+border = "#ffffff"
+highlight = "#00000000"
+text = "#000000"
+
+[button.default.pressed]
+fill = "#ffff00"
+border = "#ffffff"
+highlight = "#00000000"
+text = "#000000"
+
+[button.default.disabled]
+fill = "#000000"
+border = "#3ff23f"
+highlight = "#00000000"
+text = "#3ff23f"
+
+[button.default.focus]
+fill = "#000000"
+border = "#ffff00"
+highlight = "#ffff00"
+text = "#ffff00"
+
+[button.memory.normal]
+text = "#ffffff"
+
+[button.operator.normal]
+text = "#ffffff"
+
+[controls]
+text = "#ffffff"
+background = "#000000"
+border = "#ffffff"
+accent = "#ffff00"
+group_border = "#ffffff"
+hover = "#333333"
+focus = "#ffff00"
+
+[bits]
+text = "#ffffff"
+dim = "#3ff23f"
+index = "#ffff00"

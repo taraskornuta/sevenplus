@@ -1,4 +1,8 @@
-//! Unit conversion tables matching the Win7 "Unit conversion" panel.
+//! Unit conversion tables matching the Win7 "Unit conversion" panel (EXT-001).
+//!
+//! Factors are compile-time constants, exact by definition where the unit is defined in
+//! SI terms, otherwise given to at least 15 significant digits and checked against
+//! NIST SP 811 Appendix B (EXT-002).
 
 pub struct Category {
     pub name: &'static str,
@@ -13,6 +17,8 @@ const MI: f64 = 1609.344;
 const GAL_US: f64 = 3.785411784e-3;
 const GAL_UK: f64 = 4.54609e-3;
 const LB: f64 = 0.45359237;
+/// Pound-force in newtons (exact: lb × standard gravity 9.80665 m/s²).
+const LBF: f64 = 4.4482216152605;
 
 pub const CATEGORIES: &[Category] = &[
     Category {
@@ -44,7 +50,7 @@ pub const CATEGORIES: &[Category] = &[
             ("British thermal unit", 1055.05585262),
             ("Calorie", 4.1868),
             ("Electron-volts", 1.602176634e-19),
-            ("Foot-pound", 1.3558179483314004),
+            ("Foot-pound", FT * LBF),
             ("Joule", 1.0),
             ("Kilocalorie", 4186.8),
             ("Kilojoule", 1000.0),
@@ -77,8 +83,8 @@ pub const CATEGORIES: &[Category] = &[
         name: "Power",
         units: &[
             ("BTU/minute", 1055.05585262 / 60.0),
-            ("Foot-pound/minute", 1.3558179483314004 / 60.0),
-            ("Horsepower", 745.699_871_582_270_2),
+            ("Foot-pound/minute", FT * LBF / 60.0),
+            ("Horsepower", 550.0 * FT * LBF),
             ("Kilowatt", 1000.0),
             ("Watt", 1.0),
         ],
@@ -91,7 +97,7 @@ pub const CATEGORIES: &[Category] = &[
             ("Kilopascal", 1000.0),
             ("Millimeter of mercury", 133.322387415),
             ("Pascal", 1.0),
-            ("Pound per square inch (PSI)", 6894.757293168),
+            ("Pound per square inch (PSI)", LBF / (IN * IN)),
         ],
     },
     Category {
@@ -210,5 +216,58 @@ mod tests {
         let (_, fah) = idx("Temperature", "Degrees Fahrenheit");
         assert!((convert(t, cel, fah, 100.0) - 212.0).abs() < 1e-9);
         assert!((convert(t, fah, cel, -40.0) + 40.0).abs() < 1e-9);
+    }
+
+    /// NIST SP 811 (2008) Appendix B.8/B.9 factors to SI, with the exact definitions where
+    /// the guide marks them exact.
+    #[test]
+    fn factors_match_nist_sp_811() {
+        const NIST: &[(&str, &str, f64)] = &[
+            ("Area", "Acres", 4.046_856_422_4e3),
+            ("Area", "Square feet", 9.290_304e-2),
+            ("Area", "Square inch", 6.4516e-4),
+            ("Area", "Square mile", 2.589_988_110_336e6),
+            ("Area", "Square yard", 8.361_273_6e-1),
+            ("Energy", "British thermal unit", 1.055_055_852_62e3),
+            ("Energy", "Calorie", 4.1868),
+            ("Energy", "Electron-volts", 1.602_176_634e-19),
+            ("Energy", "Foot-pound", 1.355_817_948_331_400_4),
+            ("Length", "Chains", 2.011_68e1),
+            ("Length", "Feet", 3.048e-1),
+            ("Length", "Inches", 2.54e-2),
+            ("Length", "Miles", 1.609_344e3),
+            ("Length", "Nautical miles", 1.852e3),
+            ("Length", "PICAs", 4.233_333_333_333_333e-3),
+            ("Length", "Rods", 5.0292),
+            ("Power", "Horsepower", 7.456_998_715_822_702e2),
+            ("Pressure", "Atmosphere", 1.013_25e5),
+            ("Pressure", "Millimeter of mercury", 1.333_223_874_15e2),
+            (
+                "Pressure",
+                "Pound per square inch (PSI)",
+                6.894_757_293_168_361e3,
+            ),
+            ("Volume", "Cubic feet", 2.831_684_659_2e-2),
+            ("Volume", "Cubic inch", 1.638_706_4e-5),
+            ("Volume", "Gallon (UK)", 4.546_09e-3),
+            ("Volume", "Gallon (US)", 3.785_411_784e-3),
+            ("Volume", "Fluid ounce (US)", 2.957_352_956_25e-5),
+            ("Volume", "Fluid ounce (UK)", 2.841_306_25e-5),
+            ("Weight/Mass", "Pound", 4.535_923_7e-1),
+            ("Weight/Mass", "Ounce", 2.834_952_312_5e-2),
+            ("Weight/Mass", "Long ton", 1.016_046_908_8e3),
+            ("Weight/Mass", "Short ton", 9.071_847_4e2),
+            ("Weight/Mass", "Stone", 6.350_293_18),
+            ("Weight/Mass", "Carat", 2e-4),
+        ];
+        for (cat, unit, si) in NIST {
+            let (c, u) = idx(cat, unit);
+            let f = CATEGORIES[c].units[u].1;
+            let rel = ((f - si) / si).abs();
+            assert!(
+                rel < 1e-15,
+                "{cat}/{unit}: {f:e} vs NIST {si:e} (rel {rel:e})"
+            );
+        }
     }
 }

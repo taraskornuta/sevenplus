@@ -1,0 +1,160 @@
+# SevenPlus theme: Aero 7 (the default)
+#
+# A glass-blue homage to the Windows 7 Aero look. Every other theme builds on this one,
+# so a custom theme only needs the tokens it changes:
+#
+#     schema = 1
+#     name = "My theme"
+#     extends = "dark"          # optional; defaults to "aero7"
+#     [button.equals.normal]
+#     fill = ["#d9ecff", "#9fcbf5"]
+#
+# Put the file in the themes folder (View ▸ Themes ▸ Open themes folder) and pick it in
+# View ▸ Themes. Edits to the active theme apply when the window regains focus, and
+# Ctrl+Shift+R reloads all themes.
+#
+# Colors: "#rrggbb" or "#rrggbbaa". Gradients: one color (solid) or a list of 2–4 colors
+# spread evenly from top to bottom. All sizes are logical pixels; they scale with the
+# display's DPI setting automatically.
+
+schema = 1
+name = "Aero 7"
+# "solid" or "system" (native Mica/vibrancy where available; otherwise solid).
+backdrop = "solid"
+
+[font]
+# A .ttf/.otf path, absolute or relative to the themes folder. Empty = bundled Inter.
+file = ""
+bold_file = ""
+
+# Text roles: size in logical px, weight "regular" or "bold".
+[font.ui]
+size = 12.0
+[font.button]
+size = 13.0
+[font.display]
+size = 23.0
+[font.expression]
+size = 12.0
+[font.indicator]
+size = 11.0
+[font.history]
+size = 12.0
+[font.bits]
+size = 11.0
+[font.caption]
+size = 12.0
+
+[spacing]
+# Space around the calculator body and between its sections.
+padding = 11.0
+gap = 5.0
+button_width = 34.0
+button_height = 27.0
+
+[window]
+background = ["#e3ebf6", "#d5e1f0"]
+
+[menu]
+height = 20.0
+background = ["#eef3fa", "#dde6f2"]
+text = "#000000"
+hover = "#c5daf5"
+hover_border = "#7da2ce"
+popup_background = "#f5f7fb"
+popup_border = "#97a5bb"
+
+# The hand-drawn glass frame used when settings.toml has frame = "aero".
+[titlebar]
+height = 30.0
+# Width of the glass border around the left, right and bottom edges.
+border_width = 8.0
+radius = 7.0
+background = ["#c3d8f1f0", "#a9c4e8f0", "#9bb8e1f0", "#b1cbecf0"]
+border = "#3b5a82"
+inner_border = "#ffffff80"
+text = "#000000"
+text_glow = "#ffffffc0"
+button_height = 19.0
+min_width = 26.0
+max_width = 26.0
+close_width = 43.0
+button = ["#e9f0f9d0", "#cddcefd0", "#b2c7e4d0", "#cbdcf1d0"]
+button_hover = ["#e6f4ff", "#bfe0fb", "#82c0f0", "#a8d6f8"]
+button_border = "#4c6487"
+close = ["#e9b2a6", "#d77e69", "#c4472d", "#d4694d"]
+close_hover = ["#f6c4b6", "#ec8c73", "#e3482a", "#f2876b"]
+glyph = "#ffffff"
+glyph_outline = "#2b3e5a"
+glyph_disabled = "#ffffff70"
+
+[display]
+background = ["#fbfdff", "#eaf1fa", "#dce7f5"]
+border = "#8798b7"
+radius = 3.0
+height = 52.0
+padding = 6.0
+text = "#000000"
+expression = "#4b5563"
+indicator = "#1f2d3d"
+# History list (View ▸ History) and the statistics data list.
+history_text = "#1f2d3d"
+history_hover = "#cfe0f6"
+history_lines = 5
+selection = "#2f63b0"
+selection_text = "#ffffff"
+
+[button]
+radius = 3.0
+
+# `default` applies to every group: digit, operator, memory, function, equals.
+# Override a group with e.g. [button.equals.normal]; only the changed keys are needed.
+[button.default.normal]
+fill = ["#f4f7fb", "#e7edf5", "#dae2ee", "#d2dbe9"]
+border = "#8191ac"
+highlight = "#ffffffb0"
+text = "#000000"
+
+[button.default.hover]
+fill = ["#fff8de", "#ffeaa9", "#fdd672", "#fee28f"]
+border = "#c79b3f"
+highlight = "#ffffffc0"
+text = "#000000"
+
+[button.default.pressed]
+fill = ["#f6d79c", "#f3c167", "#efab43", "#f4c461"]
+border = "#94702f"
+highlight = "#ffffff40"
+text = "#000000"
+
+[button.default.disabled]
+fill = ["#f3f6f9", "#ebeff4", "#e3e8ef", "#dfe5ed"]
+border = "#b6c1d1"
+highlight = "#ffffff80"
+text = "#8b94a3"
+
+[button.default.focus]
+fill = ["#f4f7fb", "#e7edf5", "#dae2ee", "#d2dbe9"]
+border = "#2f6fc4"
+highlight = "#7fb2ee"
+text = "#000000"
+
+[controls]
+# Radio buttons, group boxes and the extras panel (combo boxes, text fields).
+text = "#000000"
+background = "#ffffff"
+border = "#8e9fbd"
+accent = "#2f6fc4"
+group_border = "#a6b5cb"
+hover = "#e3eefb"
+focus = "#2f6fc4"
+
+[bits]
+# Programmer mode binary bit panel.
+text = "#000000"
+dim = "#8a96a8"
+index = "#3f5273"
+
+[imagery]
+# Optional SVG drawn over the window background, relative to the themes folder.
+# window = "my-background.svg"

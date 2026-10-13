@@ -1,0 +1,102 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<!--
+  Windows installer (PKG-001), built by `cargo wix -p calc-app` with WiX Toolset 3.
+  WixUI_Advanced lets the user choose a per-user (default, no admin rights) or a
+  per-machine install. Version, CargoTargetBinDir and Platform come from cargo-wix.
+  The UpgradeCode must never change: it lets new versions replace old ones.
+-->
+<?define Root = "$(sys.SOURCEFILEDIR)..\..\..\" ?>
+<?if $(sys.BUILDARCH) = x86 ?>
+    <?define ProgramFiles = "ProgramFilesFolder" ?>
+<?else ?>
+    <?define ProgramFiles = "ProgramFiles64Folder" ?>
+<?endif ?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+    <Product
+        Id='*'
+        Name='SevenPlus Calculator'
+        UpgradeCode='305AE7DB-91CC-44A6-88A0-69515FF5A758'
+        Manufacturer='Taras Kornuta'
+        Language='1033'
+        Codepage='1252'
+        Version='$(var.Version)'>
+
+        <Package
+            Id='*'
+            Keywords='Installer'
+            Description='SevenPlus Calculator'
+            Manufacturer='Taras Kornuta'
+            InstallerVersion='500'
+            Languages='1033'
+            Compressed='yes'
+            InstallPrivileges='limited'
+            SummaryCodepage='1252'/>
+
+        <!-- Dual-purpose package: per-user by default, per-machine when chosen. -->
+        <Property Id='ALLUSERS' Value='2'/>
+        <Property Id='MSIINSTALLPERUSER' Value='1'/>
+        <Property Id='ApplicationFolderName' Value='SevenPlus Calculator'/>
+        <Property Id='WixAppFolder' Value='WixPerUserFolder'/>
+
+        <MajorUpgrade
+            Schedule='afterInstallInitialize'
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed.'/>
+        <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
+        <Property Id='DiskPrompt' Value='SevenPlus Calculator Installation'/>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='$(var.ProgramFiles)'>
+                <Directory Id='APPLICATIONFOLDER' Name='SevenPlus Calculator'>
+                    <Component Id='Binary' Guid='25091294-E5A0-4D82-891C-19936CDCA7BF'>
+                        <File
+                            Id='sevenplus.exe'
+                            Name='sevenplus.exe'
+                            DiskId='1'
+                            Source='$(var.CargoTargetBinDir)\sevenplus.exe'
+                            KeyPath='yes'/>
+                        <File Id='License' Name='LICENSE.txt' DiskId='1' Source='$(var.Root)LICENSE'/>
+                    </Component>
+                </Directory>
+            </Directory>
+            <Directory Id='ProgramMenuFolder'>
+                <Component Id='StartMenuShortcut' Guid='EBBD667F-60D6-4B9D-A423-2BFEA44C0B0C'>
+                    <Shortcut
+                        Id='StartMenuShortcut'
+                        Name='SevenPlus Calculator'
+                        Description='Calculator with standard, scientific, programmer and statistics modes'
+                        Target='[APPLICATIONFOLDER]sevenplus.exe'
+                        WorkingDirectory='APPLICATIONFOLDER'/>
+                    <RegistryValue
+                        Root='HKCU'
+                        Key='Software\SevenPlus\Calculator'
+                        Name='StartMenuShortcut'
+                        Type='integer'
+                        Value='1'
+                        KeyPath='yes'/>
+                </Component>
+            </Directory>
+        </Directory>
+
+        <Feature
+            Id='Application'
+            Title='SevenPlus Calculator'
+            Description='Installs the calculator and a Start menu shortcut.'
+            Level='1'
+            ConfigurableDirectory='APPLICATIONFOLDER'
+            AllowAdvertise='no'
+            Display='expand'
+            Absent='disallow'>
+            <ComponentRef Id='Binary'/>
+            <ComponentRef Id='StartMenuShortcut'/>
+        </Feature>
+
+        <!-- Add/Remove Programs entry (the uninstall entry itself is automatic). -->
+        <Icon Id='ProductIcon' SourceFile='$(var.Root)assets\icons\sevenplus.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='ProductIcon'/>
+        <Property Id='ARPHELPLINK' Value='https://github.com/taraskornuta/sevenplus'/>
+        <Property Id='ARPURLUPDATEINFO' Value='https://github.com/taraskornuta/sevenplus/releases'/>
+
+        <UIRef Id='WixUI_Advanced'/>
+        <WixVariable Id='WixUILicenseRtf' Value='$(var.Root)packaging\windows\License.rtf'/>
+    </Product>
+</Wix>

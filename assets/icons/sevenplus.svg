@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SevenPlus app icon: original artwork (NFR-040), the source of every PNG/ICO/ICNS.
+     Regenerate the raster icons with packaging/scripts/make_icons.py. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8aa0c0"/>
+      <stop offset="1" stop-color="#3e5070"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fcfdff"/>
+      <stop offset="1" stop-color="#d0e0f2"/>
+    </linearGradient>
+    <linearGradient id="key" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6f9fd"/>
+      <stop offset="1" stop-color="#ccd8e9"/>
+    </linearGradient>
+    <linearGradient id="op" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffecaa"/>
+      <stop offset="1" stop-color="#f6ba4c"/>
+    </linearGradient>
+    <g id="k"><rect width="33" height="28" rx="6" fill="url(#key)" stroke="#465878" stroke-width="2"/></g>
+    <g id="o"><rect width="33" height="28" rx="6" fill="url(#op)" stroke="#465878" stroke-width="2"/></g>
+  </defs>
+  <rect x="30" y="10" width="196" height="236" rx="26" fill="url(#body)" stroke="#28344c" stroke-width="4"/>
+  <rect x="31.5" y="12" width="193" height="40" rx="24" fill="#ffffff" opacity="0.12"/>
+  <rect x="48" y="28" width="160" height="52" rx="8" fill="url(#screen)" stroke="#3c506e" stroke-width="3"/>
+  <!-- "7+" drawn as strokes so the icon never depends on installed fonts -->
+  <g fill="none" stroke="#141e2d" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M124 41 H143 L131 68"/>
+    <path d="M152 54.5 H170 M161 45.5 V63.5"/>
+  </g>
+  <use href="#k" x="48" y="98"/><use href="#k" x="89" y="98"/><use href="#k" x="130" y="98"/><use href="#o" x="171" y="98"/>
+  <use href="#k" x="48" y="134"/><use href="#k" x="89" y="134"/><use href="#k" x="130" y="134"/><use href="#o" x="171" y="134"/>
+  <use href="#k" x="48" y="170"/><use href="#k" x="89" y="170"/><use href="#k" x="130" y="170"/><use href="#o" x="171" y="170"/>
+  <use href="#k" x="48" y="206"/><use href="#k" x="89" y="206"/><use href="#k" x="130" y="206"/><use href="#o" x="171" y="206"/>
+</svg>

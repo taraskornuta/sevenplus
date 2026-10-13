@@ -1,0 +1,81 @@
+# SevenPlus theme: Classic
+# Flat grey buttons in the spirit of the Windows Basic and Classic looks.
+
+schema = 1
+name = "Classic"
+
+[window]
+background = "#ece9e3"
+
+[menu]
+background = "#ece9e3"
+text = "#000000"
+hover = "#316ac5"
+hover_border = "#316ac5"
+popup_background = "#ffffff"
+popup_border = "#808080"
+
+[display]
+background = "#ffffff"
+border = "#7f9db9"
+radius = 0.0
+text = "#000000"
+expression = "#4d4d4d"
+indicator = "#000000"
+history_text = "#000000"
+history_hover = "#e5ecf7"
+selection = "#316ac5"
+selection_text = "#ffffff"
+
+[button]
+radius = 1.0
+
+[button.default.normal]
+fill = "#f5f4f0"
+border = "#8e8f8f"
+highlight = "#ffffff"
+text = "#000000"
+
+[button.default.hover]
+fill = "#ffffff"
+border = "#5c7fb5"
+highlight = "#ffffff"
+text = "#000000"
+
+[button.default.pressed]
+fill = "#d8d6cf"
+border = "#5c5d5d"
+highlight = "#00000000"
+text = "#000000"
+
+[button.default.disabled]
+fill = "#f0eee9"
+border = "#c4c2bc"
+highlight = "#00000000"
+text = "#8d8b85"
+
+[button.default.focus]
+fill = "#f5f4f0"
+border = "#000000"
+highlight = "#316ac5"
+text = "#000000"
+
+[button.memory.normal]
+text = "#a00000"
+
+[button.operator.normal]
+text = "#a00000"
+
+[controls]
+text = "#000000"
+background = "#ffffff"
+border = "#7f9db9"
+accent = "#316ac5"
+group_border = "#a3a3a3"
+hover = "#e5ecf7"
+focus = "#000000"
+
+[bits]
+text = "#000000"
+dim = "#8d8b85"
+index = "#3c3c3c"

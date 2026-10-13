@@ -1,6 +1,11 @@
 name: Release
 
-# Push a tag like v0.1.0 to build all packages and attach them to a GitHub release.
+# Push a tag like v0.2.0 to build every installer and attach them, with SHA-256
+# checksums, to a GitHub release (PKG-010). Signing steps run when their secrets exist:
+#   Windows: WINDOWS_CERTIFICATE (base64 .pfx), WINDOWS_CERTIFICATE_PASSWORD
+#   macOS:   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+#            APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+#   Linux:   RPM_GPG_KEY (armored private key), RPM_GPG_NAME
 on:
   push:
     tags: ["v*"]
@@ -13,67 +18,171 @@ permissions:
   contents: write
 
 jobs:
-  linux:
-    runs-on: ubuntu-22.04 # older glibc = packages run on more distributions
+  licenses:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: sudo apt-get update && sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libgl1-mesa-dev
-      - run: cargo install cargo-deb cargo-generate-rpm --locked
-      - run: cargo build --release -p sevenplus
-      - run: cargo deb -p sevenplus --no-build
-      - run: cargo generate-rpm -p crates/sevenplus
+      - run: cargo install cargo-about --features cli --locked
+      - run: cargo about generate -o third-party-licenses.txt about.hbs
       - uses: actions/upload-artifact@v4
         with:
-          name: linux
+          name: licenses
+          path: third-party-licenses.txt
+
+  # NFR-010: one hour of fuzzing with zero crashes before release.
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install nightly --profile minimal
+      - run: cargo +nightly install cargo-fuzz --locked
+      - run: cargo +nightly fuzz run keys -- -max_total_time=3600
+
+  linux:
+    needs: [licenses]
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: licenses
+          path: assets
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: mlugg/setup-zig@v2
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y lintian rpm rpmlint libxkbcommon-dev
+          cargo install cargo-zigbuild cargo-deb cargo-generate-rpm --locked
+      # PKG-008: link against glibc 2.31 so the binary runs on every listed distro.
+      - run: cargo zigbuild --release -p calc-app --target ${{ matrix.target }}.2.31
+      - name: Size check (PKG-009)
+        run: |
+          size=$(stat -c %s target/${{ matrix.target }}/release/sevenplus)
+          echo "binary: $size bytes"; test "$size" -le 31457280
+      - run: cargo deb -p calc-app --no-build --target ${{ matrix.target }}
+      - run: cargo generate-rpm -p crates/calc-app --target ${{ matrix.target }}
+      - run: lintian --fail-on error target/${{ matrix.target }}/debian/*.deb
+      - run: rpmlint target/${{ matrix.target }}/generate-rpm/*.rpm
+      - name: Sign RPM (PKG-006)
+        env:
+          RPM_GPG_KEY: ${{ secrets.RPM_GPG_KEY }}
+          RPM_GPG_NAME: ${{ secrets.RPM_GPG_NAME }}
+        if: env.RPM_GPG_KEY != ''
+        run: |
+          echo "$RPM_GPG_KEY" | gpg --batch --import
+          rpm --define "_gpg_name $RPM_GPG_NAME" --addsign target/${{ matrix.target }}/generate-rpm/*.rpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.target }}
           path: |
-            target/debian/*.deb
-            target/generate-rpm/*.rpm
+            target/${{ matrix.target }}/debian/*.deb
+            target/${{ matrix.target }}/generate-rpm/*.rpm
+
+  windows:
+    needs: [licenses]
+    strategy:
+      matrix:
+        target: [x86_64-pc-windows-msvc, aarch64-pc-windows-msvc]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: licenses
+          path: assets
+      - run: rustup show active-toolchain; rustup target add ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Install WiX Toolset 3 and cargo-wix
+        run: |
+          choco install wixtoolset --version=3.14.1 -y --no-progress
+          echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" >> $env:GITHUB_PATH
+          cargo install cargo-wix --locked
+      - run: cargo build --release -p calc-app --target ${{ matrix.target }}
+      - name: Sign executable (PKG-002)
+        env:
+          CERT: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        if: env.CERT != ''
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($env:CERT))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -Last 1
+          & $signtool sign /f cert.pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 target\${{ matrix.target }}\release\sevenplus.exe
+      - name: MSI (PKG-001)
+        run: cargo wix -p calc-app --no-build --nocapture --target ${{ matrix.target }} --output target\packages\ -L -sice:ICE57
+      - name: Sign MSI
+        env:
+          CERT: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        if: env.CERT != ''
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -Last 1
+          Get-ChildItem target\packages\*.msi | ForEach-Object { & $signtool sign /f cert.pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName }
+          Remove-Item cert.pfx
+      - name: Portable zip
+        shell: pwsh
+        run: |
+          $arch = if ("${{ matrix.target }}".StartsWith("aarch64")) { "arm64" } else { "x64" }
+          Compress-Archive -Path target\${{ matrix.target }}\release\sevenplus.exe, LICENSE -DestinationPath target\packages\sevenplus-windows-$arch-portable.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.target }}
+          path: |
+            target/packages/*.msi
+            target/packages/*.zip
 
   macos:
+    needs: [licenses]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v4
         with:
-          targets: aarch64-apple-darwin, x86_64-apple-darwin
+          name: licenses
+          path: assets
+      - run: rustup show active-toolchain; rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - uses: Swatinem/rust-cache@v2
       - run: cargo install cargo-packager --locked
-      - name: Build universal binary
+      - name: Build universal binary (PKG-003)
         run: |
-          cargo build --release -p sevenplus --target aarch64-apple-darwin
-          cargo build --release -p sevenplus --target x86_64-apple-darwin
+          cargo build --release -p calc-app --target aarch64-apple-darwin
+          cargo build --release -p calc-app --target x86_64-apple-darwin
           mkdir -p target/release
           lipo -create -output target/release/sevenplus \
             target/aarch64-apple-darwin/release/sevenplus \
             target/x86_64-apple-darwin/release/sevenplus
-      - run: cargo packager -p sevenplus --release --formats app,dmg
+      # cargo-packager signs with the hardened runtime and notarizes when the APPLE_*
+      # variables are set.
+      - name: App bundle and DMG
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: cargo packager -p calc-app --release --formats app,dmg
+      - name: Staple notarization ticket
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+        if: env.APPLE_ID != ''
+        run: xcrun stapler staple target/packages/*.dmg
       - uses: actions/upload-artifact@v4
         with:
           name: macos
           path: target/packages/*.dmg
 
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo install cargo-packager --locked
-      - run: cargo build --release -p sevenplus
-      - run: cargo packager -p sevenplus --release --formats nsis
-      - name: Portable zip
-        run: Compress-Archive -Path target/release/sevenplus.exe -DestinationPath target/packages/sevenplus-windows-x64-portable.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: |
-            target/packages/*.exe
-            target/packages/*.zip
-
   release:
-    needs: [linux, macos, windows]
+    needs: [linux, macos, windows, fuzz]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -81,6 +190,12 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Checksums
+        run: |
+          cd dist
+          rm -f third-party-licenses.txt
+          find . -type f ! -name SHA256SUMS -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS
+          cat SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/**/*

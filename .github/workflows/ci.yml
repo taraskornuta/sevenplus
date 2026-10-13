@@ -2,13 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   pull_request:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # ARC-009: fmt, clippy -D warnings and tests on all three OSes. The toolchain comes
+  # from rust-toolchain.toml (pinned MSRV).
   test:
     strategy:
       fail-fast: false
@@ -17,14 +19,74 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+      - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - name: Install Linux GUI dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libgl1-mesa-dev
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev
       - run: cargo fmt --all --check
         if: runner.os == 'Linux'
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      # ENG-009: every key ≤ 50 ms, measured in an optimized build.
+      - run: cargo test --release -p calc-core --test perf
+
+  # ARC-009, NFR-032: licenses, advisories and banned (network) crates.
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  # NFR-030: tests and a real app start inside a network-less namespace. The app runs
+  # on Xvfb with Mesa's software Vulkan (lavapipe), which also covers ARC-003.
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb mesa-vulkan-drivers libvulkan1 libxkbcommon-x11-0 \
+            libxkbcommon-dev libx11-dev
+          # Allow unprivileged user namespaces for `unshare -rn`.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - run: cargo test --workspace --no-run && cargo build -p calc-app --features screenshot
+      - name: Tests without network
+        run: unshare -rn cargo test --workspace --offline
+      - name: App start and screenshots without network
+        run: |
+          mkdir -p shots
+          for mode in standard scientific programmer statistics; do
+            SEVENPLUS_CONFIG_DIR="$PWD/cfg-$mode" SEVENPLUS_SCREENSHOT="shots/$mode.png" \
+            SEVENPLUS_SCREENSHOT_MODE=$mode SEVENPLUS_SCREENSHOT_INPUT="12+7*3" \
+            WAYLAND_DISPLAY= unshare -rn xvfb-run -a -s "-screen 0 1280x720x24" \
+              timeout 60 ./target/debug/sevenplus
+            test -s "shots/$mode.png"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots/
+
+  # NFR-010: a short fuzzing run on every change; the release workflow runs one hour.
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install nightly --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - run: cargo +nightly install cargo-fuzz --locked
+      - run: cargo +nightly fuzz run keys -- -max_total_time=120
+
+  # PKG-007: desktop entry and AppStream metadata are valid.
+  metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y appstream desktop-file-utils
+      - run: desktop-file-validate packaging/linux/io.github.taraskornuta.sevenplus.desktop
+      - run: appstreamcli validate --no-net packaging/linux/io.github.taraskornuta.sevenplus.metainfo.xml

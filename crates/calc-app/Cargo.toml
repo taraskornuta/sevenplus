@@ -1,0 +1,125 @@
+[package]
+name = "calc-app"
+description = "A Windows 7 style calculator with themes: standard, scientific, programmer and statistics modes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+default-run = "sevenplus"
+
+[[bin]]
+name = "sevenplus"
+path = "src/main.rs"
+
+[dependencies]
+calc-config.workspace = true
+calc-core.workspace = true
+calc-theme.workspace = true
+calc-ui.workspace = true
+eframe.workspace = true
+sys-locale = "0.3"
+tracing.workspace = true
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_Accessibility",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+muda = { version = "0.17", default-features = false }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSAccessibility", "NSScreen", "NSWorkspace", "objc2-core-foundation"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSGeometry"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11rb = { version = "0.13", default-features = false, features = ["randr"] }
+
+[build-dependencies]
+winresource = "0.1"
+
+[features]
+# Dev aid: SEVENPLUS_SCREENSHOT=out.png saves the first frames to a PNG and exits.
+screenshot = ["calc-ui/screenshot"]
+
+[lints]
+workspace = true
+
+# ---- Linux packages ---------------------------------------------------------------------
+
+[package.metadata.deb]
+name = "sevenplus"
+maintainer = "Taras Kornuta <taraskornuta@gmail.com>"
+copyright = "2026, Taras Kornuta <taraskornuta@gmail.com>"
+license-file = ["../../LICENSE", "0"]
+section = "utils"
+priority = "optional"
+depends = "$auto"
+changelog = "../../packaging/linux/changelog"
+extended-description = """\
+SevenPlus is a calculator inspired by the Windows 7 Calculator: standard, scientific, \
+programmer and statistics modes, history, unit conversion, date calculation and \
+worksheets. Its look is fully configurable through TOML theme files."""
+assets = [
+    ["target/release/sevenplus", "usr/bin/", "755"],
+    ["../../packaging/linux/io.github.taraskornuta.sevenplus.desktop", "usr/share/applications/", "644"],
+    ["../../packaging/linux/io.github.taraskornuta.sevenplus.metainfo.xml", "usr/share/metainfo/", "644"],
+    ["../../assets/icons/hicolor/16x16/apps/sevenplus.png", "usr/share/icons/hicolor/16x16/apps/", "644"],
+    ["../../assets/icons/hicolor/24x24/apps/sevenplus.png", "usr/share/icons/hicolor/24x24/apps/", "644"],
+    ["../../assets/icons/hicolor/32x32/apps/sevenplus.png", "usr/share/icons/hicolor/32x32/apps/", "644"],
+    ["../../assets/icons/hicolor/48x48/apps/sevenplus.png", "usr/share/icons/hicolor/48x48/apps/", "644"],
+    ["../../assets/icons/hicolor/64x64/apps/sevenplus.png", "usr/share/icons/hicolor/64x64/apps/", "644"],
+    ["../../assets/icons/hicolor/128x128/apps/sevenplus.png", "usr/share/icons/hicolor/128x128/apps/", "644"],
+    ["../../assets/icons/hicolor/256x256/apps/sevenplus.png", "usr/share/icons/hicolor/256x256/apps/", "644"],
+    ["../../assets/icons/hicolor/512x512/apps/sevenplus.png", "usr/share/icons/hicolor/512x512/apps/", "644"],
+    ["../../assets/icons/sevenplus.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["../../assets/fonts/Inter-LICENSE.txt", "usr/share/doc/sevenplus/", "644"],
+]
+
+[package.metadata.generate-rpm]
+name = "sevenplus"
+summary = "Calculator inspired by the Windows 7 Calculator, with themes"
+license = "MIT"
+url = "https://github.com/taraskornuta/sevenplus"
+assets = [
+    { source = "target/release/sevenplus", dest = "/usr/bin/sevenplus", mode = "755" },
+    { source = "../../packaging/linux/io.github.taraskornuta.sevenplus.desktop", dest = "/usr/share/applications/io.github.taraskornuta.sevenplus.desktop", mode = "644" },
+    { source = "../../packaging/linux/io.github.taraskornuta.sevenplus.metainfo.xml", dest = "/usr/share/metainfo/io.github.taraskornuta.sevenplus.metainfo.xml", mode = "644" },
+    { source = "../../assets/icons/hicolor/16x16/apps/sevenplus.png", dest = "/usr/share/icons/hicolor/16x16/apps/sevenplus.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/24x24/apps/sevenplus.png", dest = "/usr/share/icons/hicolor/24x24/apps/sevenplus.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/32x32/apps/sevenplus.png", dest = "/usr/share/icons/hicolor/32x32/apps/sevenplus.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/48x48/apps/sevenplus.png", dest = "/usr/share/icons/hicolor/48x48/apps/sevenplus.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/64x64/apps/sevenplus.png", dest = "/usr/share/icons/hicolor/64x64/apps/sevenplus.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/128x128/apps/sevenplus.png", dest = "/usr/share/icons/hicolor/128x128/apps/sevenplus.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/256x256/apps/sevenplus.png", dest = "/usr/share/icons/hicolor/256x256/apps/sevenplus.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/512x512/apps/sevenplus.png", dest = "/usr/share/icons/hicolor/512x512/apps/sevenplus.png", mode = "644" },
+    { source = "../../assets/icons/sevenplus.svg", dest = "/usr/share/icons/hicolor/scalable/apps/sevenplus.svg", mode = "644" },
+    { source = "../../assets/fonts/Inter-LICENSE.txt", dest = "/usr/share/doc/sevenplus/Inter-LICENSE.txt", mode = "644", doc = true },
+    { source = "../../LICENSE", dest = "/usr/share/licenses/sevenplus/LICENSE", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.requires]
+# Dependencies are detected automatically from the binary (auto-req).
+
+# ---- macOS (.app/.dmg) ------------------------------------------------------------------
+
+[package.metadata.packager]
+name = "sevenplus"
+product-name = "SevenPlus Calculator"
+identifier = "io.github.taraskornuta.sevenplus"
+category = "Utility"
+copyright = "Copyright © 2026 Taras Kornuta"
+icons = ["../../assets/icons/sevenplus.png", "../../assets/icons/sevenplus.icns", "../../assets/icons/sevenplus.ico"]
+out-dir = "../../target/packages"
+binaries = [{ path = "sevenplus", main = true }]
+
+[package.metadata.packager.macos]
+minimum-system-version = "12.0"
+info-plist-path = "../../packaging/macos/Info.plist"

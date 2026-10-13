@@ -1,0 +1,20 @@
+[package]
+name = "calc-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+calc-core = { path = "../crates/calc-core" }
+calc-format = { path = "../crates/calc-format" }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "keys"
+path = "fuzz_targets/keys.rs"
+test = false
+doc = false
+bench = false

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=SevenPlus Calculator
+GenericName=Calculator
+Comment=Calculator with standard, scientific, programmer and statistics modes
+Exec=sevenplus
+Icon=sevenplus
+Terminal=false
+Categories=Utility;Calculator;
+Keywords=calculator;calc;math;programmer;scientific;statistics;
+StartupNotify=true
+StartupWMClass=io.github.taraskornuta.sevenplus
+SingleMainWindow=false

@@ -1,0 +1,61 @@
+# cargo-deny configuration (ARC-009, NFR-032): licenses, advisories, banned crates.
+# Run: cargo deny check
+
+[graph]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "aarch64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+]
+all-features = false
+
+[advisories]
+# Unmaintained crates deep in the GUI stack are tracked, not fatal; vulnerabilities are.
+unmaintained = "workspace"
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Everything must be compatible with shipping an MIT-licensed binary.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "OFL-1.1",
+    "MPL-2.0",
+    "Ubuntu-font-1.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+# NFR-030: no network access of any kind. These crates must never enter the build.
+deny = [
+    { crate = "reqwest", reason = "no network access (NFR-030)" },
+    { crate = "hyper", reason = "no network access (NFR-030)" },
+    { crate = "ureq", reason = "no network access (NFR-030)" },
+    { crate = "curl", reason = "no network access (NFR-030)" },
+    { crate = "isahc", reason = "no network access (NFR-030)" },
+    { crate = "surf", reason = "no network access (NFR-030)" },
+    { crate = "ehttp", reason = "no network access (NFR-030)" },
+    { crate = "attohttpc", reason = "no network access (NFR-030)" },
+    { crate = "tungstenite", reason = "no network access (NFR-030)" },
+    { crate = "rustls", reason = "no network access (NFR-030)" },
+    { crate = "native-tls", reason = "no network access (NFR-030)" },
+    { crate = "openssl", reason = "no network access (NFR-030)" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

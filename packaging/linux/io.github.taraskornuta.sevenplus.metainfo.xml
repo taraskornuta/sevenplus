@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata (PKG-007). Validate with: appstreamcli validate <file> -->
+<component type="desktop-application">
+  <id>io.github.taraskornuta.sevenplus</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>SevenPlus Calculator</name>
+  <summary>Calculator with standard, scientific, programmer and statistics modes</summary>
+  <description>
+    <p>
+      SevenPlus is a desktop calculator whose behaviour and layout follow a classic
+      desktop calculator many people already know: immediate execution in Standard
+      mode, operator precedence in Scientific mode, a 64-bit Programmer mode and a
+      Statistics mode.
+    </p>
+    <ul>
+      <li>Exact arithmetic: 0.1 + 0.2 is 0.3 and 1/3 × 3 is 1</li>
+      <li>History, memory, digit grouping, copy and paste</li>
+      <li>Unit conversion, date calculation and loan and fuel worksheets</li>
+      <li>Five built-in themes and user themes in TOML</li>
+      <li>Crisp at any display scale, fully usable with the keyboard</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.taraskornuta.sevenplus.desktop</launchable>
+  <provides>
+    <binary>sevenplus</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+    <category>Calculator</category>
+  </categories>
+  <keywords>
+    <keyword>calculator</keyword>
+    <keyword>scientific</keyword>
+    <keyword>programmer</keyword>
+  </keywords>
+  <url type="homepage">https://github.com/taraskornuta/sevenplus</url>
+  <url type="bugtracker">https://github.com/taraskornuta/sevenplus/issues</url>
+  <developer id="io.github.taraskornuta">
+    <name>Taras Kornuta</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <releases>
+    <release version="0.2.0" date="2026-10-13">
+      <description>
+        <p>Exact arithmetic, five themes, accessibility and per-monitor DPI support.</p>
+      </description>
+    </release>
+  </releases>
+</component>

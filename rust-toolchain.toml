@@ -1,0 +1,5 @@
+# Minimum supported Rust version (MSRV). CI and release builds use exactly this toolchain.
+# Keep in sync with `rust-version` in Cargo.toml.
+[toolchain]
+channel = "1.95.0"
+components = ["clippy", "rustfmt"]

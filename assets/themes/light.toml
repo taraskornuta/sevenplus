@@ -1,0 +1,109 @@
+# SevenPlus theme: Light
+# A flat, modern light look with an accent-coloured equals key.
+
+schema = 1
+name = "Light"
+
+[window]
+background = "#f3f3f3"
+
+[menu]
+background = "#f3f3f3"
+text = "#1a1a1a"
+hover = "#e0e0e0"
+hover_border = "#e0e0e0"
+popup_background = "#fbfbfb"
+popup_border = "#d0d0d0"
+
+[display]
+background = "#fbfbfb"
+border = "#d6d6d6"
+radius = 4.0
+text = "#1a1a1a"
+expression = "#5c5c5c"
+indicator = "#1a1a1a"
+history_text = "#1a1a1a"
+history_hover = "#ebebeb"
+selection = "#005fb8"
+selection_text = "#ffffff"
+
+[button]
+radius = 4.0
+
+[button.default.normal]
+fill = "#ffffff"
+border = "#e3e3e3"
+highlight = "#00000000"
+text = "#1a1a1a"
+
+[button.default.hover]
+fill = "#f5f5f5"
+border = "#d6d6d6"
+highlight = "#00000000"
+text = "#1a1a1a"
+
+[button.default.pressed]
+fill = "#e8e8e8"
+border = "#cccccc"
+highlight = "#00000000"
+text = "#1a1a1a"
+
+[button.default.disabled]
+fill = "#f9f9f9"
+border = "#ececec"
+highlight = "#00000000"
+text = "#a0a0a0"
+
+[button.default.focus]
+fill = "#ffffff"
+border = "#005fb8"
+highlight = "#005fb8"
+text = "#1a1a1a"
+
+[button.digit.normal]
+fill = "#fdfdfd"
+
+[button.operator.normal]
+fill = "#f6f6f6"
+
+[button.function.normal]
+fill = "#f6f6f6"
+
+[button.memory.normal]
+fill = "#f3f3f3"
+border = "#f3f3f3"
+
+[button.equals.normal]
+fill = "#005fb8"
+border = "#004c93"
+text = "#ffffff"
+
+[button.equals.hover]
+fill = "#1a6fc0"
+border = "#004c93"
+text = "#ffffff"
+
+[button.equals.pressed]
+fill = "#004c93"
+border = "#003d77"
+text = "#ffffff"
+
+[button.equals.focus]
+fill = "#005fb8"
+border = "#1a1a1a"
+highlight = "#ffffff"
+text = "#ffffff"
+
+[controls]
+text = "#1a1a1a"
+background = "#ffffff"
+border = "#8a8a8a"
+accent = "#005fb8"
+group_border = "#d0d0d0"
+hover = "#ebebeb"
+focus = "#005fb8"
+
+[bits]
+text = "#1a1a1a"
+dim = "#a0a0a0"
+index = "#5c5c5c"

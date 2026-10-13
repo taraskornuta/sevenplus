@@ -1,0 +1,19 @@
+[package]
+name = "calc-config"
+description = "Settings and per-OS folders for the SevenPlus calculator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+calc-core.workspace = true
+directories.workspace = true
+serde.workspace = true
+toml.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

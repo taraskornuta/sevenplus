@@ -1,0 +1,185 @@
+# Examples written into the SRS and the engine's documented behaviour.
+# Format: mode | keys | display [| expression]
+# Sequences recorded on the Windows 7 reference VM go into separate files
+# (e.g. reference-standard.txt) in the same format.
+
+# STD-001: immediate execution
+standard | 2+3*4= | 20
+standard | 2+3* | 5 | 2 + 3 *
+# STD-002: a second operator replaces the pending one
+standard | 6+-2= | 4
+standard | 6*+2= | 8
+# STD-003: repeated = repeats the last operation
+standard | 2+3== | 8
+standard | 2+3=== | 11
+standard | 2+= | 4
+standard | 10-2=== | 4
+# STD-004: percent
+standard | 50+10%= | 55
+standard | 50+10% | 5 | 50 + 5
+standard | 10% | 0
+standard | 5+10%= | 5.5
+standard | 200*5%= | 2000
+# STD-005: unary functions show in the expression line
+standard | 9@ | 3 | sqrt(9)
+standard | 5+9@ | 3 | 5 + sqrt(9)
+standard | 5+9@= | 8
+standard | 4r | 0.25 | reciproc(4)
+standard | 5{NEG} | -5
+standard | 5={NEG} | -5 | negate(5)
+# STD-006: CE clears the entry, C everything but memory
+standard | 5+3{CE}4= | 9
+standard | 5+3{C} | 0
+standard | 5{MS}{C}{MR} | 5
+# STD-007: backspace edits typed digits only
+standard | 123{BS} | 12
+standard | 123{BS}{BS}{BS} | 0
+standard | 2+3={BS} | 5
+# STD-008: entry is limited to the display width
+standard | 12345678901234567890 | 1234567890123456
+scientific | 123456789012345678901234567890123456 | 12345678901234567890123456789012
+# STD-009: results beyond the display switch to scientific notation
+standard | 9999999999999999+1= | 1.e+16
+standard | 1/7000= | 1.428571428571429e-4
+standard | 1/700= | 0.0014285714285714
+
+# MEM-001
+standard | 5{MS}3{M+}{MR} | 8
+standard | 5{MS}3{M-}{MR} | 2
+standard | 5{MS}{MC}{MR} | 5
+
+# Section 4: exact arithmetic
+standard | 0.1+0.2= | 0.3
+standard | 1/3*3= | 1
+standard | 1/3= | 0.3333333333333333
+standard | 2/3= | 0.6666666666666667
+scientific | 1/3= | 0.33333333333333333333333333333333
+scientific | 2/3= | 0.66666666666666666666666666666667
+scientific | 1/3*3= | 1
+scientific | 0.1*3-0.3= | 0
+standard | 0.1+0.7= | 0.8
+
+# SCI-001: precedence and parentheses
+scientific | 2+3*4= | 14
+scientific | (2+3)*4= | 20
+scientific | 2^10= | 1024
+scientific | 2+3^2*2= | 20
+scientific | (2+3 | 3 | (2 +
+scientific | (2+3= | 5
+scientific | (2+3)* | 5 | (2 + 3) *
+scientific | ((((1+1)*2)*2)*2)= | 16
+
+# ENG-004: exact trig at exact angles
+scientific | 30s | 0.5
+scientific | 45t | 1
+scientific | 90o | 0
+scientific | 180s | 0
+scientific | 150s | 0.5
+scientific | 210s | -0.5
+scientific | 60o | 0.5
+scientific | 135t | -1
+scientific | 90t | Invalid input
+scientific | 390s | 0.5
+scientific | 30{NEG}s | -0.5
+scientific | {GRAD}100s | 1
+scientific | {GRAD}50t | 1
+scientific | {RAD}ps | 0
+scientific | 0.5is | 30
+scientific | 0.5io | 60
+scientific | 1it | 45
+scientific | {GRAD}1it | 50
+scientific | 2is | Invalid input
+
+# SCI-004/005: functions and Inv
+scientific | 5! | 120
+scientific | 0! | 1
+scientific | 0.5! | 0.88622692545275801364908374167057
+scientific | 8{INV}y3= | 2
+scientific | 27# | 19683
+scientific | 27{INV}# | 3
+scientific | 100l | 2
+scientific | 0.001l | -3
+scientific | 3g | 1000
+scientific | 1in | 2.7182818284590452353602874713527
+scientific | 1n | 0
+scientific | 12.75; | 12
+scientific | 12.75i; | 0.75
+scientific | 10.5m | 10.3
+scientific | 10.3im | 10.5
+scientific | 17d5= | 2
+scientific | 4q | 16
+scientific | 16iq | 4
+scientific | 2q | 4
+scientific | 2@ | 1.4142135623730950488016887242097
+scientific | {PI} | 3.1415926535897932384626433832795
+scientific | {INV}{PI} | 6.283185307179586476925286766559
+scientific | 0{COSH} | 1
+scientific | 0{SINH} | 0
+# SCI-007 / Exp
+scientific | 1x5 | 1.e+5
+scientific | 1x5+1= | 100001
+scientific | 1234v | 1.234e+3
+scientific | 2x{NEG}3 | 2.e-3
+scientific | 2x{NEG}3= | 0.002
+
+# ENG-006: error texts and recovery
+standard | 5/0= | Cannot divide by zero
+standard | 0/0= | Result is undefined
+standard | 0r | Cannot divide by zero
+standard | 5{NEG}@ | Invalid input
+standard | 5/0=7 | 7
+standard | 5/0=+ | Cannot divide by zero
+standard | 5/0={C} | 0
+scientific | 3249! | Overflow
+scientific | 10y10000= | Overflow
+scientific | 10y9999= | 1.e+9999
+scientific | 3{NEG}! | Invalid input
+
+# PRG: two's complement, word sizes, wrapping, integer division
+programmer | 7/2= | 3
+programmer | 7{NEG}/2= | -3
+programmer | 7%3= | 1
+programmer | 6&3|8= | 10
+programmer | 1<4= | 16
+programmer | 0~ | -1
+programmer | 5^3= | 6
+programmer | {HEX}ff+1= | 100
+programmer | {HEX}ff+1={BYTE} | 0
+programmer | {BYTE}127+1= | -128
+programmer | {BYTE}{HEX}7f+1= | 80
+programmer | {BYTE}{BIN}1j | 10
+programmer | {BYTE}{BIN}10000000j | 1
+programmer | {BYTE}{BIN}1k | 10000000
+programmer | {HEX}{BIT3} | 8
+programmer | {QWORD}9223372036854775807+1= | -9223372036854775808
+programmer | {DWORD}2147483647*2= | -2
+programmer | {WORD}{HEX}ffff | FFFF
+programmer | 8>1= | 4
+programmer | 8{NEG}>1= | -4
+programmer | 1<64= | 0
+programmer | (2+3)*4= | 20
+programmer | 2+3*4= | 14
+programmer | 5/0= | Cannot divide by zero
+programmer | {OCT}777 | 777
+programmer | {OCT}778 | 77
+programmer | {BIN}10201 | 1001
+
+# STA
+statistics | 2{ADD}4{ADD}4{ADD}4{ADD}5{ADD}5{ADD}7{ADD}9{ADD}{MEAN} | 5
+statistics | 2{ADD}4{ADD}4{ADD}4{ADD}5{ADD}5{ADD}7{ADD}9{ADD}{SDN} | 2
+statistics | 2{ADD}4{ADD}4{ADD}4{ADD}5{ADD}5{ADD}7{ADD}9{ADD}{SUM} | 40
+statistics | 2{ADD}4{ADD}4{ADD}4{ADD}5{ADD}5{ADD}7{ADD}9{ADD}{SUMSQ} | 232
+statistics | 2{ADD}4{ADD}4{ADD}4{ADD}5{ADD}5{ADD}7{ADD}9{ADD}{MEANSQ} | 29
+statistics | 2{ADD}4{ADD}4{ADD}4{ADD}5{ADD}5{ADD}7{ADD}9{ADD}{SDN1} | 2.138089935299395
+statistics | {MEAN} | Invalid input
+statistics | 5{ADD}{SDN1} | Invalid input
+statistics | {SUM} | 0
+statistics | 1{ADD}2{ADD}{CAD}{SUM} | 0
+
+# HIS-004 and mode changes keep the value
+standard | 2+3={SCIENTIFIC} | 5
+scientific | 2.5{PROGRAMMER} | 2
+
+# ENG-003: huge arguments are reduced exactly (sin(1e22) is a classic accuracy test)
+scientific | 1x22{RAD}s | -0.85220084976718880177270589375303
+scientific | 1x9999s | -0.98480775301220805936674302458952
