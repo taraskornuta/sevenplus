@@ -66,6 +66,18 @@ stat-delete = Delete
 display-memory = Memory is set
 display-parens = Open parentheses: { $count }
 display-label = Display
+display-copy-hint = Double-click to copy
+hint-hex = HEX
+hint-dec = DEC
+hint-oct = OCT
+hint-bin = BIN
+hint-qword = QWORD
+hint-dword = DWORD
+hint-word = WORD
+hint-byte = BYTE
+hint-deg = DEG
+hint-rad = RAD
+hint-grad = GRAD
 
 ## Errors (ENG-006)
 

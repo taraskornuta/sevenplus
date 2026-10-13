@@ -66,3 +66,14 @@ This is Appendix A of the requirements (KEY-003, KEY-004). On macOS, use ⌘ whe
 |---|---|
 | Insert, `a` | Add the entry to the list |
 | C with a list item selected | Delete that item |
+
+## Mouse
+
+| Action | Result |
+|---|---|
+| Double-click the result | Copy it to the clipboard |
+| Click a history entry | Load its result |
+| Click a bit (Programmer) | Flip that bit |
+| Click a statistics value, then C | Delete that value |
+| Right-click a statistics value | Delete menu |
+| Drag a window edge or corner | Zoom the whole calculator |

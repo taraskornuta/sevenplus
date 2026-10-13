@@ -69,7 +69,8 @@ Every color, size and font is a token in a TOML file, and you can add your own t
 ### Everything else
 
 - **Keyboard first.** Every key has a shortcut. Tab moves through the buttons in reading order, and Enter or Space presses the focused one. The full list is in [docs/keyboard.md](docs/keyboard.md).
-- **Copy and paste.** Paste a number, or a simple expression like `(2+3)*4`, and it is typed for you.
+- **Unit hint.** In Programmer mode a subdued `HEX · QWORD` (radix and word size) sits beside the result; in Scientific mode the angle unit (`DEG`, `RAD` or `GRAD`).
+- **Copy and paste.** Double-click the result to copy it, or use `Ctrl+C`. Paste a number, or a simple expression like `(2+3)*4`, and it is typed for you.
 - **Screen readers.** Every button has a name, and new results are announced (NVDA, VoiceOver and Orca, through AccessKit).
 - **Sharp at any scale.** The calculator supports per-monitor DPI from 100% to 300%, including fractional scales. Move it to another monitor and it re-renders at that scale. Drag a corner to zoom the whole calculator, or use `Ctrl +`, `Ctrl -` and `Ctrl 0`.
 - **Remembers where you left it.** Window position, mode, open panel, digit grouping and theme are restored at the next start.

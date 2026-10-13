@@ -4,7 +4,7 @@ use crate::app::App;
 use crate::i18n::{error_text, num, tr, tr_args};
 use crate::layout::line_h;
 use crate::paint::{self, c};
-use calc_core::{Mode, Num};
+use calc_core::{Angle, Base, Mode, Num, WordSize};
 use calc_format::{FormatSettings, Notation, Value, format};
 use eframe::egui::{
     self, Align2, FontId, Id, Painter, Rect, Sense, Stroke, StrokeKind, WidgetInfo, WidgetType,
@@ -15,6 +15,33 @@ use eframe::egui::{
 const INDICATOR_W: f32 = 16.0;
 
 impl App {
+    /// The unit the display is in: radix and word size, or the angle unit.
+    fn unit_hint(&self) -> Option<String> {
+        match self.calc.mode {
+            Mode::Programmer => {
+                let radix = match self.calc.base {
+                    Base::Hex => "hint-hex",
+                    Base::Dec => "hint-dec",
+                    Base::Oct => "hint-oct",
+                    Base::Bin => "hint-bin",
+                };
+                let word = match self.calc.word {
+                    WordSize::Qword => "hint-qword",
+                    WordSize::Dword => "hint-dword",
+                    WordSize::Word => "hint-word",
+                    WordSize::Byte => "hint-byte",
+                };
+                Some(format!("{} · {}", tr(radix), tr(word)))
+            }
+            Mode::Scientific => Some(tr(match self.calc.angle {
+                Angle::Degrees => "hint-deg",
+                Angle::Radians => "hint-rad",
+                Angle::Gradians => "hint-grad",
+            })),
+            _ => None,
+        }
+    }
+
     /// A number formatted for display in the current mode and locale.
     pub(crate) fn display_num(&self, n: &Num) -> String {
         let s = FormatSettings {
@@ -189,16 +216,30 @@ impl App {
                 value_rect.left_center(),
                 Align2::LEFT_CENTER,
                 "M",
-                indicator_font,
+                indicator_font.clone(),
                 c(d.indicator),
             );
+        }
+        // A subdued hint of the unit the number is in: radix and word size, or angle unit.
+        let hint = self.unit_hint();
+        let mut reserved = INDICATOR_W;
+        if let Some(h) = &hint {
+            let left = if state.memory { INDICATOR_W } else { 0.0 };
+            let r = p.text(
+                value_rect.left_center() + vec2(left, 0.0),
+                Align2::LEFT_CENTER,
+                h,
+                indicator_font.clone(),
+                c(d.expression),
+            );
+            reserved = reserved.max(r.right() - value_rect.left() + 8.0);
         }
         let grouping = self.settings.digit_grouping;
         let text = match state.error {
             Some(e) => error_text(e),
             None => state.text(grouping, &locale),
         };
-        let avail = value_rect.width() - INDICATOR_W;
+        let avail = value_rect.width() - reserved;
         let (text, font) = fit_value(&p, &state, text, fonts.display, avail, grouping, &locale);
         p.with_clip_rect(value_rect).text(
             value_rect.right_center() - vec2(1.0, 0.0),
@@ -208,13 +249,24 @@ impl App {
             c(d.text),
         );
 
+        // Double-click copies the value. CLICK without FOCUSABLE keeps the Tab order.
+        let resp = ui
+            .interact(value_rect, Id::new("display-value"), Sense::CLICK)
+            .on_hover_text(tr("display-copy-hint"));
+        if resp.double_clicked() {
+            ui.ctx().copy_text(self.copy_text());
+        }
+
         // Screen readers: the display is a polite live region (UI-020, UI-021).
-        let resp = ui.interact(value_rect, Id::new("display-value"), Sense::hover());
         let spoken = text.clone();
         resp.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, &spoken));
+        let label = match &hint {
+            Some(h) => format!("{}, {h}", tr("display-label")),
+            None => tr("display-label"),
+        };
         ui.ctx().accesskit_node_builder(resp.id, |node| {
             node.set_live(egui::accesskit::Live::Polite);
-            node.set_label(tr("display-label"));
+            node.set_label(label);
             node.set_value(text.clone());
         });
         self.announced = text;
