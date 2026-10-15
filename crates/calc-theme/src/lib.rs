@@ -32,6 +32,7 @@ pub const BUILTIN: &[(&str, &str)] = &[
     ),
     ("light", include_str!("../../../assets/themes/light.toml")),
     ("dark", include_str!("../../../assets/themes/dark.toml")),
+    ("macos", include_str!("../../../assets/themes/macos.toml")),
     (
         "high-contrast",
         include_str!("../../../assets/themes/high-contrast.toml"),
@@ -158,7 +159,10 @@ pub struct Theme {
     pub spacing: Spacing,
     pub window: WindowCfg,
     pub menu: MenuCfg,
-    pub titlebar: TitlebarCfg,
+    /// The `[titlebar]` table of the removed Aero glass frame; accepted and ignored so
+    /// older theme files still load.
+    #[serde(default, rename = "titlebar")]
+    _titlebar: Option<serde::de::IgnoredAny>,
     pub display: DisplayCfg,
     pub button: Buttons,
     pub controls: ControlsCfg,
@@ -242,32 +246,6 @@ pub struct MenuCfg {
     pub hover_border: Color,
     pub popup_background: Color,
     pub popup_border: Color,
-}
-
-/// The hand-drawn Aero glass frame (used when settings choose `frame = "aero"`).
-#[derive(Deserialize, Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct TitlebarCfg {
-    pub height: f32,
-    pub border_width: f32,
-    pub radius: f32,
-    pub background: Gradient,
-    pub border: Color,
-    pub inner_border: Color,
-    pub text: Color,
-    pub text_glow: Color,
-    pub button_height: f32,
-    pub min_width: f32,
-    pub max_width: f32,
-    pub close_width: f32,
-    pub button: Gradient,
-    pub button_hover: Gradient,
-    pub button_border: Color,
-    pub close: Gradient,
-    pub close_hover: Gradient,
-    pub glyph: Color,
-    pub glyph_outline: Color,
-    pub glyph_disabled: Color,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -811,6 +789,11 @@ mod tests {
                 "schema = 1\nname = \"My dark\"\nextends = \"dark\"\n[display]\ntext = \"#ff00ff\"",
             ),
             ("mine", "schema = 1\nname = \"Mine\"\nextends = \"dark\""),
+            // The Aero frame is gone; its old `[titlebar]` table is ignored.
+            (
+                "legacy",
+                "schema = 1\nname = \"Legacy\"\n[titlebar]\nheight = 30.0\nborder = \"#000000\"",
+            ),
             ("loop-a", "schema = 1\nname = \"A\"\nextends = \"loop-b\""),
             ("loop-b", "schema = 1\nname = \"B\"\nextends = \"loop-a\""),
             (
@@ -827,6 +810,7 @@ mod tests {
             store.load("mine").unwrap().display.text,
             Color::rgb(255, 0, 255)
         );
+        assert!(store.load("legacy").is_ok());
         assert!(store.load("loop-a").unwrap_err().message.contains("cycle"));
         assert!(store.load("broken").is_err());
         let ids: Vec<String> = store.list().into_iter().map(|t| t.id).collect();

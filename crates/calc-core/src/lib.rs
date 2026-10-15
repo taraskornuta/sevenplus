@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 pub mod calculator;
+pub mod chars;
 pub mod datecalc;
 pub mod keys;
 pub mod number;
@@ -12,4 +13,5 @@ pub mod units;
 pub mod worksheets;
 
 pub use calculator::*;
+pub use chars::{CharMode, from_chars, to_chars};
 pub use number::{CalcError, Num};

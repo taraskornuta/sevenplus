@@ -94,7 +94,6 @@ fn main() {
     // frame switches theme if needed.
     let (theme, _) =
         calc_ui::load_theme(&store, &settings.theme_id(false, platform.high_contrast()));
-    let aero = settings.frame == calc_config::FrameStyle::Aero;
     let natural = calc_ui::window_size(&theme, &settings, platform.native_menu());
     let scale = settings.scale.clamp(MIN_SCALE, MAX_SCALE);
     let mut viewport = egui::ViewportBuilder::default()
@@ -104,9 +103,7 @@ fn main() {
         .with_inner_size(natural * scale)
         .with_min_inner_size(natural * MIN_SCALE)
         .with_resizable(true)
-        .with_maximize_button(false)
-        .with_decorations(!aero)
-        .with_transparent(aero);
+        .with_maximize_button(false);
     if let Some(pos) = initial_position(&settings, natural * scale, &platform.monitors()) {
         viewport = viewport.with_position(pos);
     }

@@ -197,9 +197,10 @@ pub const SCIENTIFIC: &[Button] = &[
     k("10^{x}", Key::Func(Func::Pow10), Function, 4, 4),
 ];
 
-/// Programmer operators and hex digits, 3×6, left of the standard block.
+/// Programmer operators and hex digits, 3×6, left of the standard block. Bitwise
+/// operators are styled as functions so only `+ - * /` use the operator style.
 pub const PROGRAMMER: &[Button] = &[
-    k("Mod", Key::Op(BinOp::Mod), Operator, 1, 0),
+    k("Mod", Key::Op(BinOp::Mod), Function, 1, 0),
     d(10, 2, 0),
     k("(", Key::OpenParen, Function, 0, 1),
     k(")", Key::CloseParen, Function, 1, 1),
@@ -207,15 +208,21 @@ pub const PROGRAMMER: &[Button] = &[
     k("RoL", Key::Func(Func::RoL), Function, 0, 2),
     k("RoR", Key::Func(Func::RoR), Function, 1, 2),
     d(12, 2, 2),
-    k("Or", Key::Op(BinOp::Or), Operator, 0, 3),
-    k("Xor", Key::Op(BinOp::Xor), Operator, 1, 3),
+    k("Or", Key::Op(BinOp::Or), Function, 0, 3),
+    k("Xor", Key::Op(BinOp::Xor), Function, 1, 3),
     d(13, 2, 3),
-    k("Lsh", Key::Op(BinOp::Lsh), Operator, 0, 4),
-    k("Rsh", Key::Op(BinOp::Rsh), Operator, 1, 4),
+    k("Lsh", Key::Op(BinOp::Lsh), Function, 0, 4),
+    k("Rsh", Key::Op(BinOp::Rsh), Function, 1, 4),
     d(14, 2, 4),
     k("Not", Key::Func(Func::Not), Function, 0, 5),
-    k("And", Key::Op(BinOp::And), Operator, 1, 5),
+    k("And", Key::Op(BinOp::And), Function, 1, 5),
     d(15, 2, 5),
+];
+
+/// Programmer toolbar buttons, right of the text field (sized to their labels).
+pub const TOOLS: &[Button] = &[
+    k("Byte flip", Key::Func(Func::ByteFlip), Function, 0, 0),
+    k("Word flip", Key::Func(Func::WordFlip), Function, 1, 0),
 ];
 
 /// Statistics keypad, 5×5.
@@ -301,6 +308,8 @@ pub fn a11y_id(key: Key, label: &str) -> Option<&'static str> {
             Not => "key-not",
             RoL => "key-rol",
             RoR => "key-ror",
+            ByteFlip => "key-byte-flip",
+            WordFlip => "key-word-flip",
         },
         Key::Pi if label.contains('2') => "key-two-pi",
         Key::Pi => "key-pi",
@@ -371,7 +380,7 @@ pub struct ModeLayout {
     pub side: Side,
     pub side_keys: &'static [Button],
     pub list: List,
-    /// Programmer bit panel (PRG-005).
+    /// Programmer toolbar (text field, endian flips) and bit panel (PRG-005).
     pub bits: bool,
 }
 
@@ -430,6 +439,8 @@ pub struct Layout {
     pub size: Vec2,
     pub menu: Rect,
     pub display: Rect,
+    /// Programmer toolbar: ASCII/Unicode switch, text field, Byte/Word flip.
+    pub tools: Option<Rect>,
     pub bits: Option<Rect>,
     /// Origin of the main keypad block.
     pub keypad: Pos2,
@@ -479,6 +490,11 @@ pub fn compute(t: &Theme, mode: Mode, history: bool, extras: Extras, menu: bool)
     let mut y = menu_h + pad;
     let display = Rect::from_min_size(pos2(pad, y), vec2(content_w, display_h));
     y += display_h + pad;
+    let tools = ml.bits.then(|| {
+        let r = Rect::from_min_size(pos2(pad, y), vec2(content_w, t.spacing.button_height));
+        y += r.height() + pad;
+        r
+    });
     let bits = ml.bits.then(|| {
         let r = Rect::from_min_size(pos2(pad, y), vec2(content_w, 2.0 * bits_row_h(t)));
         y += r.height() + pad;
@@ -518,6 +534,7 @@ pub fn compute(t: &Theme, mode: Mode, history: bool, extras: Extras, menu: bool)
         size,
         menu: Rect::from_min_size(Pos2::ZERO, vec2(size.x, menu_h)),
         display,
+        tools,
         bits,
         keypad,
         side,
@@ -568,6 +585,7 @@ mod tests {
             .iter()
             .chain(SCIENTIFIC)
             .chain(PROGRAMMER)
+            .chain(TOOLS)
             .chain(STATISTICS)
         {
             for (label, key) in [Some((b.label, b.key)), b.inv].into_iter().flatten() {

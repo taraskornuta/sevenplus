@@ -5,7 +5,7 @@ use crate::app::App;
 use crate::menu::MenuCommand;
 use calc_config::Extras;
 use calc_core::keys::key_for_char;
-use calc_core::{Angle, Base, Key, Mode, Num, WordSize};
+use calc_core::{Angle, Base, Key, Mode, Num, WordSize, from_chars};
 use eframe::egui::{Context, Event, Key as EKey, Modifiers};
 
 const MAC: bool = cfg!(target_os = "macos");
@@ -98,6 +98,10 @@ impl App {
             if let Some(k) = k {
                 self.press(k, now);
             }
+            // Ctrl+I: type into the Programmer toolbar's text field.
+            if key == EKey::I && mode == Mode::Programmer {
+                ctx.memory_mut(|m| m.request_focus(crate::tools::chars_field_id()));
+            }
             return;
         }
         let k = match key {
@@ -131,10 +135,16 @@ impl App {
     }
 
     /// KEY-007: a number is loaded directly; anything else is fed as keypresses and
-    /// characters without a key are ignored.
+    /// characters without a key are ignored. In Programmer mode quoted text (`'A'`,
+    /// `"Hi"`) loads its character codes.
     pub(crate) fn paste(&mut self, text: &str) {
         let text = text.trim();
         if self.calc.mode == Mode::Programmer {
+            let mode = self.settings.programmer_chars;
+            if let Some(v) = quoted(text).and_then(|t| from_chars(t, mode)) {
+                self.calc.load_value(Num::from_i128(v as i128));
+                return;
+            }
             let digits: String = text.chars().filter(|c| !c.is_whitespace()).collect();
             let (neg, digits) = match digits.strip_prefix('-') {
                 Some(d) => (true, d.to_string()),
@@ -163,4 +173,11 @@ impl App {
             }
         }
     }
+}
+
+/// The text between matching single or double quotes.
+fn quoted(text: &str) -> Option<&str> {
+    ['\'', '"']
+        .iter()
+        .find_map(|q| text.strip_prefix(*q)?.strip_suffix(*q))
 }

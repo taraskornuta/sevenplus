@@ -5,7 +5,7 @@ use crate::layout;
 use crate::menu::MenuCommand;
 use crate::paint;
 use crate::{Platform, i18n::tr};
-use calc_config::{FrameStyle, Settings};
+use calc_config::Settings;
 use calc_core::{Calculator, Key, Mode};
 use calc_format::Locale;
 use calc_theme::{Theme, ThemeStore};
@@ -45,16 +45,7 @@ pub struct AppInit {
 /// Window inner size for the given theme and settings, at scale 1.0.
 pub fn window_size(t: &Theme, s: &Settings, native_menu: bool) -> Vec2 {
     let history = s.history && matches!(s.mode, Mode::Standard | Mode::Scientific);
-    let body = layout::compute(t, s.mode, history, s.extras, !native_menu).size;
-    match s.frame {
-        FrameStyle::Native => body,
-        FrameStyle::Aero => {
-            body + vec2(
-                2.0 * t.titlebar.border_width,
-                t.titlebar.height + t.titlebar.border_width,
-            )
-        }
-    }
+    layout::compute(t, s.mode, history, s.extras, !native_menu).size
 }
 
 /// Loads the theme the settings ask for, falling back to the default (THM-004).
@@ -82,8 +73,6 @@ pub struct App {
     os_dark: bool,
     os_high_contrast: bool,
     focused: bool,
-    /// Frame style the window was created with (transparency can't change later).
-    pub(crate) created_frame: FrameStyle,
     last_size: Option<Vec2>,
     /// Requested physical window size and when it was requested; the scale is frozen
     /// until the window reaches it so a mode switch doesn't change the zoom.
@@ -92,6 +81,8 @@ pub struct App {
     pub(crate) about_open: bool,
     pub(crate) licenses_open: bool,
     pub(crate) prefs_open: bool,
+    /// Programmer toolbar text field contents.
+    pub(crate) chars_text: String,
     pub(crate) stat_selected: Option<usize>,
     pub(crate) flash: Option<(Key, f64)>,
     pub(crate) os_locale: Locale,
@@ -128,7 +119,6 @@ impl App {
             calc,
             saved: settings.clone(),
             last_save: 0.0,
-            created_frame: settings.frame,
             settings,
             store,
             theme,
@@ -145,6 +135,7 @@ impl App {
             about_open: false,
             licenses_open: false,
             prefs_open: false,
+            chars_text: String::new(),
             stat_selected: None,
             flash: None,
             os_locale: Locale::from_tag(&locale_tag),
@@ -383,11 +374,6 @@ impl App {
                 self.settings.scale = 1.0;
                 self.last_size = None;
             }
-            MenuCommand::Frame(f) => {
-                self.settings.frame = f;
-                ctx.send_viewport_cmd(ViewportCommand::Decorations(f == FrameStyle::Native));
-                self.last_size = None;
-            }
             MenuCommand::Copy => ctx.copy_text(self.copy_text()),
             MenuCommand::Paste => ctx.send_viewport_cmd(ViewportCommand::RequestPaste),
             MenuCommand::CopyHistory => {
@@ -589,11 +575,7 @@ pub(crate) fn open_path(path: &std::path::Path) {
 
 impl eframe::App for App {
     fn clear_color(&self, _v: &egui::Visuals) -> [f32; 4] {
-        if self.created_frame == FrameStyle::Aero {
-            [0.0; 4]
-        } else {
-            egui::Rgba::from(paint::c(self.theme.window.background.first())).to_array()
-        }
+        egui::Rgba::from(paint::c(self.theme.window.background.first())).to_array()
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -624,11 +606,7 @@ impl eframe::App for App {
         );
         self.update_scale(&ctx, want);
 
-        let win = ui.max_rect();
-        let client = match self.settings.frame {
-            FrameStyle::Aero => self.draw_aero_frame(ui, win),
-            FrameStyle::Native => win,
-        };
+        let client = ui.max_rect();
         paint::gradient_rect(
             ui.painter(),
             client,
@@ -645,6 +623,9 @@ impl eframe::App for App {
         self.draw_display(ui, l.display.translate(off), history);
         let radios: Vec<Rect> = l.radios.iter().map(|r| r.translate(off)).collect();
         self.draw_radios(ui, &radios);
+        if let Some(r) = l.tools {
+            self.draw_tools(ui, r.translate(off));
+        }
         if let Some(b) = l.bits {
             self.draw_bits(ui, b.translate(off));
         }
@@ -672,7 +653,7 @@ impl eframe::App for App {
         self.about(&ctx);
         self.licenses_window(&ctx);
         self.preferences(&ctx);
-        self.draw_notice(ui, win);
+        self.draw_notice(ui, client);
         if self.flash.is_some_and(|(_, t)| now - t < FLASH_SECS) {
             ctx.request_repaint();
         }

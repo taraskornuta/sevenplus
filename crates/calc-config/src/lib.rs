@@ -6,7 +6,7 @@
 
 #![forbid(unsafe_code)]
 
-use calc_core::{Angle, Base, Mode, WordSize};
+use calc_core::{Angle, Base, CharMode, Mode, WordSize};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -16,14 +16,6 @@ pub const SCHEMA: u32 = 1;
 pub const MAX_FILE_SIZE: u64 = 1024 * 1024;
 /// `theme` value that follows the OS light/dark setting (THM-002).
 pub const SYSTEM_THEME: &str = "system";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum FrameStyle {
-    #[default]
-    Native,
-    Aero,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -49,8 +41,6 @@ pub struct Settings {
     pub theme_dark: String,
     /// Switch to the High Contrast theme when the OS high-contrast mode is on (UI-024).
     pub follow_high_contrast: bool,
-    /// `"native"` OS window frame or hand-drawn `"aero"` glass frame.
-    pub frame: FrameStyle,
     pub mode: Mode,
     pub history: bool,
     pub digit_grouping: bool,
@@ -74,6 +64,8 @@ pub struct Settings {
     pub copy_grouping: bool,
     /// Programmer-mode buttons show C operator signs (`<<`, `&`, `~`…) instead of words.
     pub programmer_c_signs: bool,
+    /// Programmer mode shows the value as ASCII or Unicode characters.
+    pub programmer_chars: CharMode,
 }
 
 impl Default for Settings {
@@ -81,10 +73,9 @@ impl Default for Settings {
         Settings {
             schema: SCHEMA,
             theme: SYSTEM_THEME.into(),
-            theme_light: "aero7".into(),
+            theme_light: "light".into(),
             theme_dark: "dark".into(),
             follow_high_contrast: true,
-            frame: FrameStyle::Native,
             mode: Mode::Standard,
             history: false,
             digit_grouping: false,
@@ -100,6 +91,7 @@ impl Default for Settings {
             copy_locale_decimal: false,
             copy_grouping: false,
             programmer_c_signs: true,
+            programmer_chars: CharMode::Ascii,
         }
     }
 }
@@ -275,7 +267,7 @@ impl Settings {
     pub fn save_to(&self, path: &Path) -> std::io::Result<()> {
         let body = toml::to_string(self).map_err(std::io::Error::other)?;
         let header = "# SevenPlus settings, saved automatically.\n\
-            # theme = \"system\" or a theme id; frame = \"native\" | \"aero\".\n";
+            # theme = \"system\" or a theme id.\n";
         write_atomic(path, &format!("{header}{body}"))
     }
 
@@ -383,7 +375,7 @@ mod tests {
     #[test]
     fn theme_selection() {
         let s = Settings::default();
-        assert_eq!(s.theme_id(false, false), "aero7");
+        assert_eq!(s.theme_id(false, false), "light");
         assert_eq!(s.theme_id(true, false), "dark");
         assert_eq!(s.theme_id(true, true), "high-contrast");
         let s = Settings {

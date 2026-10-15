@@ -57,7 +57,13 @@ impl App {
     }
 
     /// One button; returns its key when clicked.
-    fn draw_button(&self, ui: &egui::Ui, rect: Rect, b: &Button, block: &str) -> Option<Key> {
+    pub(crate) fn draw_button(
+        &self,
+        ui: &egui::Ui,
+        rect: Rect,
+        b: &Button,
+        block: &str,
+    ) -> Option<Key> {
         let t = &self.theme.button;
         let (label, key) = b.resolve(self.calc.inv);
         let enabled = self.calc.enabled(key);

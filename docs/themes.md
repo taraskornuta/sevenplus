@@ -1,6 +1,6 @@
 # Themes
 
-A theme is a TOML file of design tokens. Every built-in theme is a file in [`assets/themes/`](../assets/themes). [`aero7.toml`](../assets/themes/aero7.toml) is the default, lists every token, and has comments explaining each one.
+A theme is a TOML file of design tokens. Every built-in theme is a file in [`assets/themes/`](../assets/themes). [`aero7.toml`](../assets/themes/aero7.toml) is the base of every other theme. It lists every token and has comments explaining each one. Older themes may still have a `[titlebar]` table from the removed Aero glass frame; it is ignored.
 
 ## Making a theme
 
@@ -40,7 +40,6 @@ A theme only needs the tokens it changes. Everything else comes from the theme i
 | `[button.<group>.<state>]` | `fill`, `border`, `text`, `highlight`, `radius` |
 | `[controls]` | `text`, `background`, `border`, `accent`, `group_border`, `hover`, `focus` |
 | `[bits]` | `text`, `dim`, `index` |
-| `[titlebar]` | The Aero glass frame; see `aero7.toml` |
 | `[imagery]` | `window`: an SVG drawn over the window background |
 
 The button groups are `digit`, `operator`, `memory`, `function` and `equals`, plus `default`, which applies to all of them. The states are `normal`, `hover`, `pressed`, `disabled` and `focus`.

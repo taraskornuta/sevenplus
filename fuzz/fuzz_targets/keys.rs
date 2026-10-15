@@ -23,7 +23,7 @@ const OPS: [BinOp; 12] = [
     BinOp::Rsh,
 ];
 
-const FUNCS: [Func; 29] = [
+const FUNCS: [Func; 31] = [
     Func::Sqrt,
     Func::Reciprocal,
     Func::Square,
@@ -53,6 +53,8 @@ const FUNCS: [Func; 29] = [
     Func::Not,
     Func::RoL,
     Func::RoR,
+    Func::ByteFlip,
+    Func::WordFlip,
 ];
 
 const KEYS: [Key; 20] = [

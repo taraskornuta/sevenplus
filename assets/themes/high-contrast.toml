@@ -24,21 +24,6 @@ hover_border = "#ffffff"
 popup_background = "#000000"
 popup_border = "#ffffff"
 
-[titlebar]
-background = "#000000"
-border = "#ffffff"
-inner_border = "#ffffff"
-text = "#ffffff"
-text_glow = "#00000000"
-button = "#000000"
-button_hover = "#1aebff"
-button_border = "#ffffff"
-close = "#000000"
-close_hover = "#ffff00"
-glyph = "#ffffff"
-glyph_outline = "#000000"
-glyph_disabled = "#808080"
-
 [display]
 background = "#000000"
 border = "#ffffff"

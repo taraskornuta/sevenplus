@@ -170,6 +170,10 @@ pub enum Func {
     Not,
     RoL,
     RoR,
+    /// Reverses the byte order within the word size (endianness swap).
+    ByteFlip,
+    /// Reverses the order of the 16-bit units within the word size.
+    WordFlip,
 }
 
 impl Func {
@@ -209,12 +213,17 @@ impl Func {
             Func::Not => "NOT".into(),
             Func::RoL => "RoL".into(),
             Func::RoR => "RoR".into(),
+            Func::ByteFlip => "bswap".into(),
+            Func::WordFlip => "wswap".into(),
         }
     }
 
     /// Functions available in Programmer mode.
     fn integer(self) -> bool {
-        matches!(self, Func::Not | Func::RoL | Func::RoR)
+        matches!(
+            self,
+            Func::Not | Func::RoL | Func::RoR | Func::ByteFlip | Func::WordFlip
+        )
     }
 }
 
@@ -494,6 +503,9 @@ impl Calculator {
                 Key::Point | Key::Percent | Key::Pi | Key::Exp | Key::FE | Key::Inv => false,
                 Key::Stat(_) | Key::StatAdd | Key::StatClear => false,
                 Key::Op(op) => !matches!(op, BinOp::Pow | BinOp::Root),
+                // A flip needs at least two bytes or two 16-bit units to swap.
+                Key::Func(Func::ByteFlip) => self.word.bits() >= 16,
+                Key::Func(Func::WordFlip) => self.word.bits() >= 32,
                 Key::Func(f) => f.integer(),
                 Key::CloseParen => self.paren_depth() > 0,
                 _ => true,
@@ -1222,6 +1234,10 @@ impl Calculator {
                 Func::Not => !v,
                 Func::RoL => ((u << 1) | (u >> (bits - 1))) as i64,
                 Func::RoR => ((u >> 1) | ((u & 1) << (bits - 1))) as i64,
+                Func::ByteFlip => (u.swap_bytes() >> (64 - bits)) as i64,
+                Func::WordFlip => (0..bits / 16)
+                    .fold(0u64, |acc, i| (acc << 16) | ((u >> (16 * i)) & 0xFFFF))
+                    as i64,
                 _ => return Err(CalcError::InvalidInput),
             };
             return Ok(Num::from_i64(self.word.wrap(r)));
@@ -1266,7 +1282,9 @@ impl Calculator {
                 d.add(&m.div(&Num::from_i64(60))?)?
                     .add(&s.div(&Num::from_i64(3600))?)
             }
-            Func::Not | Func::RoL | Func::RoR => Err(CalcError::InvalidInput),
+            Func::Not | Func::RoL | Func::RoR | Func::ByteFlip | Func::WordFlip => {
+                Err(CalcError::InvalidInput)
+            }
         }
     }
 

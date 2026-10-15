@@ -4,7 +4,7 @@
 use crate::app::App;
 use crate::i18n::tr;
 use crate::paint::{self, c};
-use calc_config::{Extras, FrameStyle, SYSTEM_THEME};
+use calc_config::{Extras, SYSTEM_THEME};
 use calc_core::Mode;
 use eframe::egui::{self, Button, Rect, Stroke, UiBuilder};
 
@@ -22,7 +22,6 @@ pub enum MenuCommand {
     ZoomIn,
     ZoomOut,
     ResetSize,
-    Frame(FrameStyle),
     Copy,
     Paste,
     CopyHistory,
@@ -235,19 +234,6 @@ impl App {
             item(ui, false, &tr("view-reset-size"), "Ctrl+0"),
             MenuCommand::ResetSize,
         );
-        ui.menu_button(tr("view-window-frame"), |ui| {
-            for (f, id) in [
-                (FrameStyle::Native, "frame-native"),
-                (FrameStyle::Aero, "frame-aero"),
-            ] {
-                if item(ui, self.settings.frame == f, &tr(id), "") {
-                    out = Some(MenuCommand::Frame(f));
-                }
-            }
-            if self.settings.frame != self.created_frame {
-                ui.label(egui::RichText::new(tr("frame-restart")).small());
-            }
-        });
         out
     }
 

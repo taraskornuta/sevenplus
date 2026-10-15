@@ -1,0 +1,149 @@
+# SevenPlus theme: macOS
+# Modelled on the macOS Calculator: a dark grey display and window, flat light grey
+# keys separated by hairlines, and orange arithmetic keys.
+#
+# The bundled font is Inter. On a Mac you can point [font] at SF Pro instead, e.g.
+#     [font]
+#     file = "/System/Library/Fonts/SFNS.ttf"
+# in a copy of this file in the themes folder.
+#
+# The orange keys use dark labels: white on this orange is about 2.3:1, below the
+# WCAG AA contrast that every built-in theme meets.
+
+schema = 1
+name = "macOS"
+extends = "light"
+
+[font.display]
+size = 30.0
+[font.button]
+size = 15.0
+
+[spacing]
+padding = 6.0
+gap = 1.0
+button_width = 40.0
+button_height = 30.0
+
+[window]
+background = "#575757"
+
+[menu]
+background = "#4a4a4a"
+text = "#f2f2f2"
+hover = "#6a6a6a"
+hover_border = "#6a6a6a"
+popup_background = "#3c3c3c"
+popup_border = "#2a2a2a"
+
+[display]
+background = "#4a4a4a"
+border = "#4a4a4a"
+radius = 0.0
+height = 62.0
+text = "#ffffff"
+expression = "#c8c8c8"
+indicator = "#ffffff"
+history_text = "#e6e6e6"
+history_hover = "#5e5e5e"
+selection = "#f5923e"
+selection_text = "#1a1a1a"
+
+[button]
+radius = 0.0
+
+[button.default.normal]
+fill = "#e0e0e0"
+border = "#8f8f8f"
+highlight = "#00000000"
+text = "#1a1a1a"
+
+[button.default.hover]
+fill = "#ebebeb"
+border = "#8f8f8f"
+highlight = "#00000000"
+text = "#1a1a1a"
+
+[button.default.pressed]
+fill = "#b4b4b4"
+border = "#8f8f8f"
+highlight = "#00000000"
+text = "#1a1a1a"
+
+[button.default.disabled]
+fill = "#cfcfcf"
+border = "#8f8f8f"
+highlight = "#00000000"
+text = "#8a8a8a"
+
+[button.default.focus]
+fill = "#e0e0e0"
+border = "#2a2a2a"
+highlight = "#2a2a2a"
+text = "#1a1a1a"
+
+[button.digit.normal]
+fill = "#e0e0e0"
+
+[button.function.normal]
+fill = "#d4d4d4"
+
+[button.memory.normal]
+fill = "#d4d4d4"
+border = "#8f8f8f"
+
+[button.operator.normal]
+fill = "#f5923e"
+border = "#8f8f8f"
+text = "#1a1a1a"
+
+[button.operator.hover]
+fill = "#f7a35c"
+border = "#8f8f8f"
+text = "#1a1a1a"
+
+[button.operator.pressed]
+fill = "#d97a28"
+border = "#8f8f8f"
+text = "#1a1a1a"
+
+[button.operator.focus]
+fill = "#f5923e"
+border = "#2a2a2a"
+highlight = "#2a2a2a"
+text = "#1a1a1a"
+
+[button.equals.normal]
+fill = "#f5923e"
+border = "#8f8f8f"
+text = "#1a1a1a"
+
+[button.equals.hover]
+fill = "#f7a35c"
+border = "#8f8f8f"
+text = "#1a1a1a"
+
+[button.equals.pressed]
+fill = "#d97a28"
+border = "#8f8f8f"
+text = "#1a1a1a"
+
+[button.equals.focus]
+fill = "#f5923e"
+border = "#2a2a2a"
+highlight = "#2a2a2a"
+text = "#1a1a1a"
+
+[controls]
+text = "#f2f2f2"
+background = "#3c3c3c"
+border = "#a0a0a0"
+accent = "#f5923e"
+group_border = "#6e6e6e"
+hover = "#666666"
+focus = "#f5923e"
+
+[bits]
+text = "#ffffff"
+dim = "#9a9a9a"
+index = "#e0e0e0"

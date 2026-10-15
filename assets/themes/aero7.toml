@@ -64,30 +64,6 @@ hover_border = "#7da2ce"
 popup_background = "#f5f7fb"
 popup_border = "#97a5bb"
 
-# The hand-drawn glass frame used when settings.toml has frame = "aero".
-[titlebar]
-height = 30.0
-# Width of the glass border around the left, right and bottom edges.
-border_width = 8.0
-radius = 7.0
-background = ["#c3d8f1f0", "#a9c4e8f0", "#9bb8e1f0", "#b1cbecf0"]
-border = "#3b5a82"
-inner_border = "#ffffff80"
-text = "#000000"
-text_glow = "#ffffffc0"
-button_height = 19.0
-min_width = 26.0
-max_width = 26.0
-close_width = 43.0
-button = ["#e9f0f9d0", "#cddcefd0", "#b2c7e4d0", "#cbdcf1d0"]
-button_hover = ["#e6f4ff", "#bfe0fb", "#82c0f0", "#a8d6f8"]
-button_border = "#4c6487"
-close = ["#e9b2a6", "#d77e69", "#c4472d", "#d4694d"]
-close_hover = ["#f6c4b6", "#ec8c73", "#e3482a", "#f2876b"]
-glyph = "#ffffff"
-glyph_outline = "#2b3e5a"
-glyph_disabled = "#ffffff70"
-
 [display]
 background = ["#fbfdff", "#eaf1fa", "#dce7f5"]
 border = "#8798b7"

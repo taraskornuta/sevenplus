@@ -38,6 +38,10 @@ Arithmetic is exact. `0.1 + 0.2` is `0.3` and `1 / 3 * 3` is `1`, because number
 - `And`, `Or`, `Xor`, `Not`, `Lsh`, `Rsh`, `RoL`, `RoR`, `Mod`, and integer division that truncates toward zero.
 - C syntax: the expression line shows `12 << 2 &`, `~x`, `%`, and you can type or paste `(1<<4)|3`. Buttons show the C signs too; Preferences can switch them back to `Lsh`, `And`, `Not`…
 - Keys that don't fit the current base are disabled. The 64-bit panel shows every bit; click a bit to flip it.
+- **Toolbar.** A row above the bit panel converts between numbers and text and swaps byte order:
+  - **ASCII | Unicode** chooses how the value reads as text: one byte per character, or UTF-16.
+  - The **text field** shows the value as text (`4869` reads `Hi`). Type in it, or press `Ctrl+I` to jump there, and the value follows what you type. Characters the font can't draw show as their code, e.g. `U+4869`. You can also paste quoted text such as `'A'` or `"Hi"`.
+  - **Byte flip** (`y`) reverses the byte order within the word size: Dword `11223344` becomes `44332211`. **Word flip** (`w`) reverses the 16-bit halves: `33441122`.
 
 ### Statistics mode
 
@@ -63,7 +67,7 @@ These panels open beside the keypad, and the window grows to fit them:
 
 ![Dark, Classic, Light and High Contrast themes](docs/screenshots/themes.png)
 
-Five themes are built in: **Aero 7** (the default glass-blue look), **Classic**, **Light**, **Dark** and **High Contrast**. By default the calculator follows your system's light/dark setting, and it switches to High Contrast when the system's high-contrast mode is on. Switching themes takes effect immediately, without losing your calculation.
+Six themes are built in: **Light** (the default), **Dark**, **macOS** (dark grey display, flat grey keys, orange operators), **Aero 7** (glass blue), **Classic** and **High Contrast**. By default the calculator follows your system's light/dark setting, using Light or Dark, and it switches to High Contrast when the system's high-contrast mode is on. Switching themes takes effect immediately, without losing your calculation.
 
 Every color, size and font is a token in a TOML file, and you can add your own themes without rebuilding anything. See [docs/themes.md](docs/themes.md).
 
@@ -75,7 +79,6 @@ Every color, size and font is a token in a TOML file, and you can add your own t
 - **Screen readers.** Every button has a name, and new results are announced (NVDA, VoiceOver and Orca, through AccessKit).
 - **Sharp at any scale.** The calculator supports per-monitor DPI from 100% to 300%, including fractional scales. Move it to another monitor and it re-renders at that scale. Drag a corner to zoom the whole calculator, or use `Ctrl +`, `Ctrl -` and `Ctrl 0`.
 - **Remembers where you left it.** Window position, mode, open panel, digit grouping and theme are restored at the next start.
-- **Window frame.** Use the native OS frame, or a hand-drawn Aero glass frame (View ▸ Window frame).
 - **Private.** The calculator works offline, with no network access and no telemetry.
 
 ## Install

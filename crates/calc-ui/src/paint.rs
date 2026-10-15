@@ -2,7 +2,7 @@
 
 use calc_theme::{Color, Weight};
 use eframe::egui::{
-    Align2, Color32, CornerRadius, FontFamily, FontId, Mesh, Painter, Pos2, Rect, Shape, Stroke,
+    Color32, CornerRadius, FontFamily, FontId, Mesh, Painter, Pos2, Rect, Shape, Stroke,
     StrokeKind, pos2, vec2,
 };
 
@@ -214,29 +214,6 @@ pub fn rich_label(p: &Painter, center: Pos2, text: &str, font: FontId, color: Co
         p.galley(pos2(x, y), g, color);
         x += w;
     }
-}
-
-/// Text with a soft glow behind it (Aero caption).
-pub fn glow_text(
-    p: &Painter,
-    pos: Pos2,
-    align: Align2,
-    text: &str,
-    font: FontId,
-    color: Color32,
-    glow: Color32,
-) {
-    for (dx, dy) in [
-        (-1.0, 0.0),
-        (1.0, 0.0),
-        (0.0, -1.0),
-        (0.0, 1.0),
-        (-1.0, -1.0),
-        (1.0, 1.0),
-    ] {
-        p.text(pos + vec2(dx, dy), align, text, font.clone(), glow);
-    }
-    p.text(pos, align, text, font, color);
 }
 
 pub struct RadioColors {

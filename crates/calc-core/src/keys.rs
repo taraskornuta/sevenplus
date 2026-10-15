@@ -25,6 +25,8 @@ pub fn key_for_char(c: char, mode: Mode, inv: bool) -> Option<Key> {
             '~' => Some(Key::Func(Not)),
             'j' | 'J' => Some(Key::Func(RoL)),
             'k' | 'K' => Some(Key::Func(RoR)),
+            'y' | 'Y' => Some(Key::Func(ByteFlip)),
+            'w' | 'W' => Some(Key::Func(WordFlip)),
             '(' => Some(Key::OpenParen),
             ')' => Some(Key::CloseParen),
             '=' | '\n' => Some(Key::Equals),
@@ -262,6 +264,35 @@ mod tests {
         c.press(Key::ToggleBit(3));
         assert_eq!(c.display(), "8");
         assert_eq!(c.bits(), 8);
+    }
+
+    #[test]
+    fn endian_flips() {
+        let mut c = calc(Mode::Programmer);
+        c.set_base(Base::Hex);
+        c.set_word(WordSize::Dword);
+        feed(&mut c, "11223344y");
+        assert_eq!(c.display(), "44332211");
+        assert_eq!(c.expression(), "bswap(11223344)");
+        feed(&mut c, "y");
+        assert_eq!(c.display(), "11223344");
+        feed(&mut c, "w");
+        assert_eq!(c.display(), "33441122");
+        c.set_word(WordSize::Qword);
+        c.press(Key::Clear);
+        feed(&mut c, "800000000444CCABy");
+        assert_eq!(c.display(), "ABCC440400000080");
+        feed(&mut c, "w");
+        assert_eq!(c.display(), "8000004404ABCC");
+        c.set_word(WordSize::Word);
+        assert!(c.enabled(Key::Func(Func::ByteFlip)));
+        assert!(!c.enabled(Key::Func(Func::WordFlip)));
+        c.set_word(WordSize::Byte);
+        assert!(!c.enabled(Key::Func(Func::ByteFlip)));
+        // A disabled flip leaves the value alone.
+        c.press(Key::Clear);
+        feed(&mut c, "7fy");
+        assert_eq!(c.display(), "7F");
     }
 
     #[test]

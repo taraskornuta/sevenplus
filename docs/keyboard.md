@@ -56,7 +56,8 @@ This is Appendix A of the requirements (KEY-003, KEY-004). On macOS, use ⌘ whe
 | `^` | Xor | `~` | Not |
 | `<` or `<<` | Lsh | `>` or `>>` | Rsh |
 | `j` | RoL | `k` | RoR |
-| `(` `)` | Parentheses | | |
+| `y` | Byte flip (swap endianness) | `w` | Word flip |
+| `(` `)` | Parentheses | Ctrl+I | Type in the text field |
 | F5 / F6 / F7 / F8 | Hex / Dec / Oct / Bin | | |
 | F12 / F2 / F3 / F4 | Qword / Dword / Word / Byte | | |
 

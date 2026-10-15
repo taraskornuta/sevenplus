@@ -8,13 +8,13 @@ mod app;
 mod dialogs;
 mod display;
 mod extras;
-mod frame;
 pub mod i18n;
 mod input;
 mod keypad;
 pub mod layout;
 pub mod menu;
 mod paint;
+mod tools;
 
 pub use app::{App, AppInit, MAX_SCALE, MIN_SCALE, load_theme, window_size};
 pub use eframe::egui::Rect;
