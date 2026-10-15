@@ -1,0 +1,87 @@
+# SevenPlus theme: Glass
+# Frosted light glass: the desktop shows through a blurred, translucent window, and the
+# display and keys are milky panels on top of it.
+
+schema = 1
+name = "Glass"
+extends = "light"
+backdrop = "system"
+
+[window]
+background = ["#eef3f9c4", "#dfe7f1bc"]
+
+[menu]
+background = "#00000000"
+hover = "#ffffff80"
+hover_border = "#ffffffa0"
+
+[display]
+background = ["#ffffffe0", "#f6f9fcd8"]
+border = "#ffffffb0"
+radius = 6.0
+
+[button]
+radius = 6.0
+
+[button.default.normal]
+fill = ["#ffffffd0", "#f4f7fbc8"]
+border = "#ffffffa0"
+highlight = "#ffffffe0"
+text = "#1a1a1a"
+
+[button.default.hover]
+fill = ["#ffffffe8", "#f8fafde0"]
+border = "#ffffffd0"
+highlight = "#ffffff"
+text = "#1a1a1a"
+
+[button.default.pressed]
+fill = ["#e3eaf3e0", "#d8e1ecd8"]
+border = "#ffffff80"
+highlight = "#ffffff60"
+text = "#1a1a1a"
+
+[button.default.disabled]
+fill = "#ffffff80"
+border = "#ffffff60"
+highlight = "#00000000"
+text = "#6b7280"
+
+[button.default.focus]
+fill = ["#ffffffd0", "#f4f7fbc8"]
+border = "#005fb8"
+highlight = "#005fb8"
+text = "#1a1a1a"
+
+[button.digit.normal]
+fill = ["#ffffffe0", "#f8fafdd8"]
+
+[button.operator.normal]
+fill = ["#f4f7fbd0", "#eaf0f7c8"]
+
+[button.function.normal]
+fill = ["#f4f7fbd0", "#eaf0f7c8"]
+
+[button.memory.normal]
+fill = "#ffffff70"
+border = "#ffffff50"
+
+[button.equals.normal]
+fill = ["#1a64c0f0", "#005fb8f0"]
+border = "#ffffff80"
+highlight = "#ffffff60"
+text = "#ffffff"
+
+[controls]
+text = "#1a1a1a"
+background = "#ffffffd0"
+border = "#6b7a90"
+accent = "#005fb8"
+group_border = "#ffffffb0"
+hover = "#ffffff80"
+focus = "#005fb8"
+
+[bits]
+text = "#1a1a1a"
+dim = "#5b6472"
+index = "#1e2530"

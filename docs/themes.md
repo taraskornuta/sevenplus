@@ -29,7 +29,7 @@ A theme only needs the tokens it changes. Everything else comes from the theme i
 
 | Table | Tokens |
 |---|---|
-| top level | `schema` (must be 1), `name`, `extends`, `backdrop` (`"solid"` or `"system"`) |
+| top level | `schema` (must be 1), `name`, `extends`, `backdrop`: `"system"` makes the window see-through with the desktop blurred behind it (the `[window]` background's alpha, times the opacity setting, sets how much shows through); `"solid"` makes it opaque. Aero 7 is `"system"`, so themes that extend it inherit glass unless they set `"solid"`. |
 | `[font]` | `file`, `bold_file`: font paths, relative to the themes folder. Empty uses the bundled Inter. |
 | `[font.<role>]` | `size` (logical px), `weight` (`"regular"` or `"bold"`). Roles: `ui`, `button`, `display`, `expression`, `indicator`, `history`, `bits`, `caption` |
 | `[spacing]` | `padding`, `gap`, `button_width`, `button_height` |

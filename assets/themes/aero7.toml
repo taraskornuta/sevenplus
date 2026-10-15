@@ -19,8 +19,10 @@
 
 schema = 1
 name = "Aero 7"
-# "solid" or "system" (native Mica/vibrancy where available; otherwise solid).
-backdrop = "solid"
+# "system": a see-through window with the desktop blurred behind it (KDE, Windows 11
+# Acrylic, macOS); the window background's alpha sets how much shows through. "solid":
+# an opaque window. Themes that extend this one inherit "system" unless they say "solid".
+backdrop = "system"
 
 [font]
 # A .ttf/.otf path, absolute or relative to the themes folder. Empty = bundled Inter.
@@ -53,7 +55,8 @@ button_width = 34.0
 button_height = 27.0
 
 [window]
-background = ["#e3ebf6", "#d5e1f0"]
+# Translucent glass blue; scaled by the opacity setting.
+background = ["#c9dcf2d4", "#b4cdeacc"]
 
 [menu]
 height = 20.0
@@ -129,7 +132,7 @@ focus = "#2f6fc4"
 # Programmer mode binary bit panel.
 text = "#000000"
 dim = "#8a96a8"
-index = "#3f5273"
+index = "#101a28"
 
 [imagery]
 # Optional SVG drawn over the window background, relative to the themes folder.

@@ -66,7 +66,14 @@ pub struct Settings {
     pub programmer_c_signs: bool,
     /// Programmer mode shows the value as ASCII or Unicode characters.
     pub programmer_chars: CharMode,
+    /// Glass themes (`backdrop = "system"`) make the window see-through and blurred.
+    pub transparency: bool,
+    /// Opacity of a glass theme's window tint, [`MIN_OPACITY`] to 1.
+    pub opacity: f32,
 }
+
+/// Lowest window opacity the Preferences slider allows.
+pub const MIN_OPACITY: f32 = 0.5;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -92,6 +99,8 @@ impl Default for Settings {
             copy_grouping: false,
             programmer_c_signs: true,
             programmer_chars: CharMode::Ascii,
+            transparency: true,
+            opacity: 0.85,
         }
     }
 }
@@ -248,6 +257,11 @@ impl Settings {
             settings.theme = migrate_theme(&settings.theme);
             settings.schema = SCHEMA;
         }
+        settings.opacity = if settings.opacity.is_finite() {
+            settings.opacity.clamp(MIN_OPACITY, 1.0)
+        } else {
+            Settings::default().opacity
+        };
         if !settings.scale.is_finite() {
             settings.scale = 1.0;
         }

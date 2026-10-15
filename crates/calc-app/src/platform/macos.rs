@@ -306,6 +306,12 @@ impl Platform for Mac {
         NSWorkspace::sharedWorkspace().accessibilityDisplayShouldIncreaseContrast()
     }
 
+    /// System Settings ▸ Accessibility ▸ Display ▸ Reduce transparency. The blur
+    /// itself is set through winit.
+    fn reduce_transparency(&self) -> bool {
+        NSWorkspace::sharedWorkspace().accessibilityDisplayShouldReduceTransparency()
+    }
+
     fn native_menu(&self) -> bool {
         true
     }

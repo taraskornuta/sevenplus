@@ -3,7 +3,8 @@
 use crate::app::App;
 use crate::i18n::{tr, tr_args};
 use crate::menu::MenuCommand;
-use calc_config::SYSTEM_THEME;
+use calc_config::{MIN_OPACITY, SYSTEM_THEME};
+use calc_theme::Backdrop;
 use eframe::egui::{self, Align2, ComboBox, Context, ScrollArea, Vec2};
 
 /// Releases page linked from About (PKG-012: no auto-updater).
@@ -85,6 +86,7 @@ impl App {
         let mut open = self.prefs_open;
         let mut chosen = None;
         let themes = self.store.list();
+        let glass_theme = self.theme.backdrop == Backdrop::System;
         let name_of = |id: &str| {
             themes
                 .iter()
@@ -152,6 +154,26 @@ impl App {
                     .changed()
                 {
                     chosen = Some(s.theme.clone());
+                }
+                ui.checkbox(&mut s.transparency, tr("prefs-transparency"));
+                ui.add_enabled_ui(s.transparency && glass_theme, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(tr("prefs-opacity"));
+                        ui.add(
+                            egui::Slider::new(&mut s.opacity, MIN_OPACITY..=1.0)
+                                .custom_formatter(|v, _| format!("{:.0}%", v * 100.0))
+                                .custom_parser(|t| {
+                                    t.trim_end_matches('%')
+                                        .trim()
+                                        .parse::<f64>()
+                                        .ok()
+                                        .map(|v| v / 100.0)
+                                }),
+                        );
+                    });
+                });
+                if !glass_theme {
+                    ui.label(egui::RichText::new(tr("prefs-no-glass")).small());
                 }
                 ui.separator();
                 ui.strong(tr("prefs-numbers"));

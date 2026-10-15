@@ -1,0 +1,77 @@
+# SevenPlus theme: Glass Dark
+# Smoked glass: a dark, blurred, translucent window with frosted dark keys.
+
+schema = 1
+name = "Glass Dark"
+extends = "dark"
+backdrop = "system"
+
+[window]
+background = ["#1c222ccc", "#141921c8"]
+
+[menu]
+background = "#00000000"
+hover = "#ffffff28"
+hover_border = "#ffffff40"
+
+[display]
+background = ["#10141ce8", "#0c1016e8"]
+border = "#ffffff30"
+radius = 6.0
+
+[button]
+radius = 6.0
+
+[button.default.normal]
+fill = ["#3d4555d8", "#2f3644d0"]
+border = "#ffffff20"
+highlight = "#ffffff30"
+text = "#f0f3f7"
+
+[button.default.hover]
+fill = ["#4c5870e0", "#3f4a60d8"]
+border = "#ffffff40"
+highlight = "#ffffff40"
+text = "#ffffff"
+
+[button.default.pressed]
+fill = ["#2a3a56e0", "#24324ad8"]
+border = "#ffffff20"
+highlight = "#ffffff18"
+text = "#ffffff"
+
+[button.default.disabled]
+fill = "#2a303c90"
+border = "#ffffff10"
+highlight = "#00000000"
+text = "#7c8594"
+
+[button.default.focus]
+fill = ["#3d4555d8", "#2f3644d0"]
+border = "#8fb8f5"
+highlight = "#8fb8f560"
+text = "#ffffff"
+
+[button.memory.normal]
+fill = "#2a303c90"
+border = "#ffffff18"
+
+[button.equals.normal]
+fill = ["#3a72c4f0", "#2c5fa8f0"]
+border = "#ffffff40"
+highlight = "#ffffff40"
+text = "#ffffff"
+
+[controls]
+text = "#eef1f5"
+background = "#10141ce0"
+border = "#8a96a8"
+accent = "#6ea3ee"
+group_border = "#ffffff30"
+hover = "#ffffff20"
+focus = "#8fb8f5"
+
+[bits]
+text = "#eef1f5"
+dim = "#8a93a3"
+index = "#e2eaf6"

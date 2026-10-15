@@ -19,9 +19,11 @@ egui_extras = { version = "0.36", default-features = false, features = ["datepic
 fluent-bundle = "0.16"
 image = { version = "0.25", default-features = false, features = ["png"], optional = true }
 jiff = { version = "0.2.38", default-features = false }
+raw-window-handle.workspace = true
 toml.workspace = true
 tracing.workspace = true
 unic-langid = { version = "0.9", features = ["macros"] }
+winit.workspace = true
 
 [features]
 # Dev aid: SEVENPLUS_SCREENSHOT=out.png saves the first frames to a PNG and exits.

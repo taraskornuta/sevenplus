@@ -13,6 +13,8 @@
 schema = 1
 name = "macOS"
 extends = "light"
+# A see-through, blurred window like the real one; the keys stay opaque.
+backdrop = "system"
 
 [font.display]
 size = 30.0
@@ -26,10 +28,10 @@ button_width = 40.0
 button_height = 30.0
 
 [window]
-background = "#575757"
+background = "#2e2e2ee0"
 
 [menu]
-background = "#4a4a4a"
+background = "#00000000"
 text = "#f2f2f2"
 hover = "#6a6a6a"
 hover_border = "#6a6a6a"
@@ -37,8 +39,8 @@ popup_background = "#3c3c3c"
 popup_border = "#2a2a2a"
 
 [display]
-background = "#4a4a4a"
-border = "#4a4a4a"
+background = "#262626f0"
+border = "#26262600"
 radius = 0.0
 height = 62.0
 text = "#ffffff"

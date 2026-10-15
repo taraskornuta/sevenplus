@@ -33,6 +33,11 @@ pub const BUILTIN: &[(&str, &str)] = &[
     ("light", include_str!("../../../assets/themes/light.toml")),
     ("dark", include_str!("../../../assets/themes/dark.toml")),
     ("macos", include_str!("../../../assets/themes/macos.toml")),
+    ("glass", include_str!("../../../assets/themes/glass.toml")),
+    (
+        "glass-dark",
+        include_str!("../../../assets/themes/glass-dark.toml"),
+    ),
     (
         "high-contrast",
         include_str!("../../../assets/themes/high-contrast.toml"),
@@ -726,6 +731,12 @@ mod tests {
         }
         assert_eq!(store.list().len(), BUILTIN.len());
         assert_eq!(Theme::builtin().name, "Aero 7");
+        // aero7 is glass; themes built on it opt out unless they are glass themes too.
+        for (id, _) in BUILTIN {
+            let glass = matches!(*id, "aero7" | "macos" | "glass" | "glass-dark");
+            let backdrop = store.load(id).unwrap().backdrop;
+            assert_eq!(backdrop == Backdrop::System, glass, "{id}");
+        }
     }
 
     #[test]
@@ -903,6 +914,37 @@ mod tests {
                 t.window.background.stops(),
                 window,
             );
+            // Glass: text on the see-through window must stay readable whatever is
+            // behind it, at the default opacity setting (0.85).
+            if t.backdrop == Backdrop::System {
+                let surfaces = [
+                    ("radio labels", t.controls.text, None),
+                    ("bits", t.bits.text, None),
+                    ("bit index", t.bits.index, None),
+                    ("menu", t.menu.text, Some(t.menu.background.first())),
+                    (
+                        "display text",
+                        t.display.text,
+                        Some(t.display.background.first()),
+                    ),
+                ];
+                for (behind_name, behind) in [
+                    ("black", Color::rgb(0, 0, 0)),
+                    ("white", Color::rgb(255, 255, 255)),
+                ] {
+                    for &Color([r, g, b, a]) in t.window.background.stops() {
+                        let tint = Color([r, g, b, (a as f32 * 0.85).round() as u8]).over(behind);
+                        for (what, fg, surface) in surfaces {
+                            let bg = surface.map_or(tint, |s| s.over(tint));
+                            let ratio = fg.over(bg).contrast(bg);
+                            if ratio < 4.5 {
+                                failures
+                                    .push(format!("{id}: {what} over {behind_name}: {ratio:.2}:1"));
+                            }
+                        }
+                    }
+                }
+            }
         }
         assert!(
             failures.is_empty(),

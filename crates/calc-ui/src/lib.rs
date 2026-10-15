@@ -19,6 +19,7 @@ mod tools;
 pub use app::{App, AppInit, MAX_SCALE, MIN_SCALE, load_theme, window_size};
 pub use eframe::egui::Rect;
 pub use menu::{MenuCommand, MenuState};
+pub use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
 /// OS services the UI needs beyond egui. Every method has a do-nothing default.
 pub trait Platform {
@@ -45,6 +46,15 @@ pub trait Platform {
 
     /// Updates check marks of the native menu.
     fn sync_menu(&mut self, _state: &MenuState) {}
+
+    /// Turns the blurred backdrop behind a transparent window on or off, where winit
+    /// can't (Wayland `ext-background-effect`, X11 under KWin, Windows 11 Acrylic).
+    fn set_blur(&self, _window: RawWindowHandle, _display: RawDisplayHandle, _on: bool) {}
+
+    /// Whether the OS asks apps to reduce transparency (Windows, macOS).
+    fn reduce_transparency(&self) -> bool {
+        false
+    }
 }
 
 /// A platform with none of the optional services.

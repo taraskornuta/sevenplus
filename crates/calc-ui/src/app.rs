@@ -8,11 +8,12 @@ use crate::{Platform, i18n::tr};
 use calc_config::Settings;
 use calc_core::{Calculator, Key, Mode};
 use calc_format::Locale;
-use calc_theme::{Theme, ThemeStore};
+use calc_theme::{Backdrop, Color, Theme, ThemeStore};
 use eframe::egui::{
     self, Color32, Context, FontData, FontDefinitions, FontFamily, FontId, Pos2, Rect, Stroke,
     TextStyle, UiBuilder, Vec2, ViewportCommand, vec2,
 };
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -72,6 +73,10 @@ pub struct App {
     theme_mtime: Option<SystemTime>,
     os_dark: bool,
     os_high_contrast: bool,
+    /// The OS asks apps to reduce transparency.
+    os_reduce_transparency: bool,
+    /// Blur last requested for the window, to call the OS only on change.
+    blur_applied: Option<bool>,
     focused: bool,
     last_size: Option<Vec2>,
     /// Requested physical window size and when it was requested; the scale is frozen
@@ -128,6 +133,8 @@ impl App {
             theme_mtime: None,
             os_dark,
             os_high_contrast,
+            os_reduce_transparency: platform.reduce_transparency(),
+            blur_applied: None,
             focused: true,
             last_size: None,
             pending_size: None,
@@ -315,6 +322,7 @@ impl App {
             let hc = self.platform.high_contrast();
             changed |= hc != self.os_high_contrast;
             self.os_high_contrast = hc;
+            self.os_reduce_transparency = self.platform.reduce_transparency();
         }
         if changed || regained {
             // Theme files edited while the window was in the background apply now.
@@ -334,6 +342,51 @@ impl App {
         }
         self.calc.apply_key(key);
         self.flash = Some((key, now));
+    }
+
+    /// Whether the window is see-through and blurred: a glass theme
+    /// (`backdrop = "system"`) with transparency on and not reduced by the OS.
+    pub(crate) fn glass(&self) -> bool {
+        self.theme.backdrop == Backdrop::System
+            && self.settings.transparency
+            && !self.os_reduce_transparency
+    }
+
+    /// The window tint: its alpha scaled by the opacity setting for glass, otherwise
+    /// opaque so a glass theme still works as a solid one.
+    fn window_background(&self) -> Vec<Color> {
+        let glass = self.glass();
+        self.theme
+            .window
+            .background
+            .stops()
+            .iter()
+            .map(|&Color([r, g, b, a])| {
+                let a = if glass {
+                    (a as f32 * self.settings.opacity).round() as u8
+                } else {
+                    255
+                };
+                Color([r, g, b, a])
+            })
+            .collect()
+    }
+
+    /// Asks the OS to blur what is behind the window while glass is on. winit covers
+    /// macOS and older KWin; the platform covers the rest.
+    fn sync_blur(&mut self, frame: &eframe::Frame) {
+        let on = self.glass();
+        if self.blur_applied == Some(on) {
+            return;
+        }
+        let Some(window) = frame.winit_window() else {
+            return;
+        };
+        window.set_blur(on);
+        if let (Ok(w), Ok(d)) = (window.window_handle(), window.display_handle()) {
+            self.platform.set_blur(w.as_raw(), d.as_raw(), on);
+        }
+        self.blur_applied = Some(on);
     }
 
     pub(crate) fn set_mode(&mut self, mode: Mode) {
@@ -575,10 +628,13 @@ pub(crate) fn open_path(path: &std::path::Path) {
 
 impl eframe::App for App {
     fn clear_color(&self, _v: &egui::Visuals) -> [f32; 4] {
-        egui::Rgba::from(paint::c(self.theme.window.background.first())).to_array()
+        if self.glass() {
+            return [0.0; 4];
+        }
+        egui::Rgba::from(paint::c(self.window_background()[0])).to_array()
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         let now = ctx.input(|i| i.time);
         self.watch_environment(&ctx);
@@ -607,12 +663,8 @@ impl eframe::App for App {
         self.update_scale(&ctx, want);
 
         let client = ui.max_rect();
-        paint::gradient_rect(
-            ui.painter(),
-            client,
-            0.0,
-            self.theme.window.background.stops(),
-        );
+        self.sync_blur(frame);
+        paint::gradient_rect(ui.painter(), client, 0.0, &self.window_background());
         self.draw_imagery(ui, client);
         // When the window's aspect differs from the calculator's, center the body below a
         // full-width menu bar.

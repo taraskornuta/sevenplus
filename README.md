@@ -67,7 +67,18 @@ These panels open beside the keypad, and the window grows to fit them:
 
 ![Dark, Classic, Light and High Contrast themes](docs/screenshots/themes.png)
 
-Six themes are built in: **Light** (the default), **Dark**, **macOS** (dark grey display, flat grey keys, orange operators), **Aero 7** (glass blue), **Classic** and **High Contrast**. By default the calculator follows your system's light/dark setting, using Light or Dark, and it switches to High Contrast when the system's high-contrast mode is on. Switching themes takes effect immediately, without losing your calculation.
+Eight themes are built in: **Light** (the default), **Dark**, **Glass**, **Glass Dark**, **macOS** (dark grey display, flat grey keys, orange operators), **Aero 7** (glass blue), **Classic** and **High Contrast**. By default the calculator follows your system's light/dark setting, using Light or Dark, and it switches to High Contrast when the system's high-contrast mode is on. Switching themes takes effect immediately, without losing your calculation.
+
+**Glass.** Glass, Glass Dark, macOS and Aero 7 make the window see-through, with the desktop blurred behind it:
+
+| Platform | Effect |
+|---|---|
+| KDE Plasma (Wayland or X11) | Blur, with the Blur desktop effect on |
+| Windows 11 (22H2 and later) | Acrylic |
+| macOS | Blur |
+| GNOME, older Windows | See-through, without blur |
+
+Preferences ▸ **Transparency effects** turns this off, and **Window opacity** (50–100%) sets how much shows through. When Windows or macOS is set to reduce transparency, the window stays opaque.
 
 Every color, size and font is a token in a TOML file, and you can add your own themes without rebuilding anything. See [docs/themes.md](docs/themes.md).
 

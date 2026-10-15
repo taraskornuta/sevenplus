@@ -103,7 +103,10 @@ fn main() {
         .with_inner_size(natural * scale)
         .with_min_inner_size(natural * MIN_SCALE)
         .with_resizable(true)
-        .with_maximize_button(false);
+        .with_maximize_button(false)
+        // Always transparent so glass themes can be switched on live (X11 only allows
+        // this at creation); solid themes paint an opaque background.
+        .with_transparent(true);
     if let Some(pos) = initial_position(&settings, natural * scale, &platform.monitors()) {
         viewport = viewport.with_position(pos);
     }

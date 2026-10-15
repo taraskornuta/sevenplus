@@ -3,6 +3,7 @@
 
 schema = 1
 name = "Dark"
+backdrop = "solid"
 
 [window]
 background = ["#2b3038", "#1f232a"]

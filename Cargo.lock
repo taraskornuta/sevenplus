@@ -621,10 +621,14 @@ dependencies = [
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
+ "raw-window-handle",
  "sys-locale",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols",
  "windows-sys 0.61.2",
  "winresource",
  "x11rb",
@@ -682,9 +686,11 @@ dependencies = [
  "fluent-bundle",
  "image",
  "jiff",
+ "raw-window-handle",
  "toml",
  "tracing",
  "unic-langid",
+ "winit",
 ]
 
 [[package]]

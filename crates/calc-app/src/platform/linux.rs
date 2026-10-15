@@ -1,19 +1,25 @@
-//! Linux: X11 monitor geometry via RandR, GNOME's high-contrast flag, and message
-//! boxes through zenity or kdialog. Wayland hides window positions, so no monitors are
+//! Linux: X11 monitor geometry via RandR, GNOME's high-contrast flag, blur behind the
+//! window (Wayland `ext-background-effect`, KWin's X11 hint), and message boxes through
+//! zenity or kdialog. Wayland hides window positions, so no monitors are
 //! reported there and the compositor places the window.
 
-use calc_ui::{Platform, Rect};
+use super::wayland_blur::WaylandBlur;
+use calc_ui::{Platform, RawDisplayHandle, RawWindowHandle, Rect};
 use eframe::egui::{Pos2, Vec2};
+use std::cell::RefCell;
 use std::process::Command;
 
 pub struct Linux {
     monitors: Vec<Rect>,
+    /// Wayland blur, set up on first use; `Some(None)` when the compositor lacks it.
+    wayland_blur: RefCell<Option<Option<WaylandBlur>>>,
 }
 
 impl Linux {
     pub fn new() -> Linux {
         Linux {
             monitors: x11_monitors().unwrap_or_default(),
+            wayland_blur: RefCell::new(None),
         }
     }
 }
@@ -69,6 +75,50 @@ impl Platform for Linux {
     fn high_contrast(&self) -> bool {
         gnome_high_contrast()
     }
+
+    #[allow(unsafe_code)]
+    fn set_blur(&self, window: RawWindowHandle, display: RawDisplayHandle, on: bool) {
+        let id = match (window, display) {
+            (RawWindowHandle::Wayland(w), RawDisplayHandle::Wayland(d)) => {
+                let mut blur = self.wayland_blur.borrow_mut();
+                // SAFETY: both handles come from the live calculator window, which
+                // lasts as long as the app (and so this platform object).
+                let blur =
+                    blur.get_or_insert_with(|| unsafe { WaylandBlur::new(d.display, w.surface) });
+                match blur {
+                    Some(b) => b.set(on),
+                    None => tracing::debug!("the compositor offers no ext-background-effect"),
+                }
+                return;
+            }
+            (RawWindowHandle::Xlib(h), _) => h.window as u32,
+            (RawWindowHandle::Xcb(h), _) => h.window.get(),
+            _ => return,
+        };
+        if let Err(e) = x11_blur(id, on) {
+            tracing::debug!("cannot set the KDE blur hint: {e}");
+        }
+    }
+}
+
+/// Sets or clears `_KDE_NET_WM_BLUR_BEHIND_REGION`; an empty region asks KWin to blur
+/// behind the whole window. Other window managers ignore it.
+fn x11_blur(window: u32, on: bool) -> Result<(), Box<dyn std::error::Error>> {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{AtomEnum, ConnectionExt, PropMode};
+    use x11rb::wrapper::ConnectionExt as _;
+    let (conn, _) = x11rb::connect(None)?;
+    let atom = conn
+        .intern_atom(false, b"_KDE_NET_WM_BLUR_BEHIND_REGION")?
+        .reply()?
+        .atom;
+    if on {
+        conn.change_property32(PropMode::REPLACE, window, atom, AtomEnum::CARDINAL, &[])?;
+    } else {
+        conn.delete_property(window, atom)?;
+    }
+    conn.flush()?;
+    Ok(())
 }
 
 /// Shows an error dialog with zenity or kdialog, whichever is installed.
