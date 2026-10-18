@@ -1,10 +1,15 @@
 //! Drawing helpers: gradients, Win7 buttons, rich labels, radio buttons.
 
-use calc_theme::{Color, Weight};
+use calc_theme::{ButtonState, Color, Gradient, Weight};
 use eframe::egui::{
-    Color32, CornerRadius, FontFamily, FontId, Mesh, Painter, Pos2, Rect, Shape, Stroke,
-    StrokeKind, pos2, vec2,
+    Color32, CornerRadius, FontFamily, FontId, Galley, Mesh, Painter, Pos2, Rect, Shape, Stroke,
+    StrokeKind,
+    epaint::{RectShape, Tessellator},
+    pos2,
+    text::{LayoutJob, TextFormat},
+    vec2,
 };
+use std::sync::Arc;
 
 /// Font family name of the bold face.
 pub const BOLD: &str = "bold";
@@ -63,49 +68,63 @@ pub fn gradient_rect(p: &Painter, rect: Rect, radius: f32, stops: &[Color]) {
     if stops.is_empty() || rect.height() <= 0.0 {
         return;
     }
-    let r = radius
-        .min(rect.width() / 2.0)
-        .min(rect.height() / 2.0)
-        .max(0.0);
-    let (top, bottom, h) = (rect.top(), rect.bottom(), rect.height());
-    let mut ys = vec![top, bottom];
-    const STEPS: usize = 6;
-    if r > 0.0 {
-        for i in 1..=STEPS {
-            let a = (i as f32 / STEPS as f32) * std::f32::consts::FRAC_PI_2;
-            ys.push(top + r - r * a.cos());
-            ys.push(bottom - r + r * a.cos());
-        }
+    let r = self::radius(
+        radius
+            .min(rect.width() / 2.0)
+            .min(rect.height() / 2.0)
+            .max(0.0),
+    );
+    if let [solid] = stops {
+        p.rect_filled(rect, r, c(*solid));
+        return;
     }
-    for i in 1..stops.len().saturating_sub(1) {
-        ys.push(top + h * i as f32 / (stops.len() - 1) as f32);
-    }
-    ys.sort_by(f32::total_cmp);
-    ys.dedup_by(|a, b| (*a - *b).abs() < 0.01);
-
-    let inset = |y: f32| {
-        let dy = if y < top + r {
-            top + r - y
-        } else if y > bottom - r {
-            y - (bottom - r)
-        } else {
-            return 0.0;
-        };
-        r - (r * r - dy * dy).max(0.0).sqrt()
-    };
+    // Let egui tessellate a white rounded rect, so the edges are anti-aliased exactly
+    // like the border strokes, then tint each vertex by its height. The white's alpha
+    // is the edge coverage and scales the gradient color.
+    let options = p.ctx().tessellation_options(|o| *o);
+    let mut tess = Tessellator::new(p.pixels_per_point(), options, [1, 1], Vec::new());
     let mut mesh = Mesh::default();
-    for (i, &y) in ys.iter().enumerate() {
-        let c = gradient_at(stops, (y - top) / h);
-        let d = inset(y);
-        mesh.colored_vertex(pos2(rect.left() + d, y), c);
-        mesh.colored_vertex(pos2(rect.right() - d, y), c);
-        if i > 0 {
-            let k = (i * 2) as u32;
-            mesh.add_triangle(k - 2, k - 1, k);
-            mesh.add_triangle(k - 1, k + 1, k);
-        }
+    tess.tessellate_rect(&RectShape::filled(rect, r, Color32::WHITE), &mut mesh);
+    for v in &mut mesh.vertices {
+        let coverage = v.color.a() as f32 / 255.0;
+        let t = (v.pos.y - rect.top()) / rect.height();
+        v.color = gradient_at(stops, t).gamma_multiply(coverage);
     }
     p.add(Shape::mesh(mesh));
+}
+
+/// A theme color between `a` and `b`, mixed with premultiplied alpha.
+fn mix(a: Color32, b: Color32, t: f32) -> Color {
+    Color(lerp_color(a, b, t).to_srgba_unmultiplied())
+}
+
+/// The button style `t` of the way from `a` to `b`, for smooth state changes.
+/// Gradients with different stop counts are resampled to the longer one.
+pub fn blend(a: &ButtonState, b: &ButtonState, t: f32) -> ButtonState {
+    if t <= 0.0 {
+        return a.clone();
+    }
+    if t >= 1.0 {
+        return b.clone();
+    }
+    let n = a.fill.stops().len().max(b.fill.stops().len());
+    let at = |i: usize| i as f32 / (n.max(2) - 1) as f32;
+    let fill = (0..n)
+        .map(|i| {
+            let (x, y) = (
+                gradient_at(a.fill.stops(), at(i)),
+                gradient_at(b.fill.stops(), at(i)),
+            );
+            mix(x, y, t)
+        })
+        .collect();
+    ButtonState {
+        fill: Gradient(fill),
+        border: mix(c(a.border), c(b.border), t),
+        text: mix(c(a.text), c(b.text), t),
+        highlight: mix(c(a.highlight), c(b.highlight), t),
+        radius: if t < 0.5 { a.radius } else { b.radius },
+    }
 }
 
 pub fn radius(r: f32) -> CornerRadius {
@@ -136,18 +155,36 @@ pub fn button_body(
     );
 }
 
+/// Letter spacing for display-size text: large digits read too far apart, so they
+/// get tightened; smaller text keeps the font's own spacing.
+fn tracking(size: f32) -> f32 {
+    if size >= 20.0 { -0.02 * size } else { 0.0 }
+}
+
+/// Lays out one line of text with size-aware tracking.
+pub fn tracked(p: &Painter, text: &str, font: FontId, color: Color32) -> Arc<Galley> {
+    let format = TextFormat {
+        extra_letter_spacing: tracking(font.size),
+        font_id: font,
+        color,
+        ..Default::default()
+    };
+    p.layout_job(LayoutJob::single_section(text.to_string(), format))
+}
+
 enum Seg<'a> {
     Normal(&'a str),
     Super(&'a str),
+    Sub(&'a str),
     Over(&'a str),
 }
 
-/// Splits label markup: `^{..}` is superscript, `~{..}` is overlined.
+/// Splits label markup: `^{..}` is superscript, `_{..}` subscript, `~{..}` overlined.
 fn segments(text: &str) -> Vec<Seg<'_>> {
     let mut out = Vec::new();
     let mut rest = text;
     while !rest.is_empty() {
-        let next = rest.find("^{").into_iter().chain(rest.find("~{")).min();
+        let next = ["^{", "_{", "~{"].iter().filter_map(|m| rest.find(m)).min();
         match next {
             Some(i) => {
                 if i > 0 {
@@ -155,10 +192,10 @@ fn segments(text: &str) -> Vec<Seg<'_>> {
                 }
                 let close = rest[i..].find('}').map_or(rest.len(), |j| i + j);
                 let inner = &rest[i + 2..close];
-                out.push(if rest[i..].starts_with('^') {
-                    Seg::Super(inner)
-                } else {
-                    Seg::Over(inner)
+                out.push(match rest.as_bytes()[i] {
+                    b'^' => Seg::Super(inner),
+                    b'_' => Seg::Sub(inner),
+                    _ => Seg::Over(inner),
                 });
                 rest = rest.get(close + 1..).unwrap_or("");
             }
@@ -183,12 +220,31 @@ pub fn rich_label(p: &Painter, center: Pos2, text: &str, font: FontId, color: Co
         p.line_segment([center - vec2(w, 0.0), center + vec2(h - w, h)], s);
         return;
     }
+    if text == "⌫" {
+        // Delete-left: a tag pointing left with an × inside.
+        let (w, h) = (size * 0.55, size * 0.34);
+        let s = Stroke::new(1.3, color);
+        let (l, r, t, b) = (center.x - w, center.x + w, center.y - h, center.y + h);
+        let tip = l + h;
+        let outline = vec![
+            pos2(l, center.y),
+            pos2(tip, t),
+            pos2(r, t),
+            pos2(r, b),
+            pos2(tip, b),
+        ];
+        p.add(Shape::closed_line(outline, s));
+        let (cx, x) = ((tip + r) / 2.0, h * 0.45);
+        p.line_segment([pos2(cx - x, center.y - x), pos2(cx + x, center.y + x)], s);
+        p.line_segment([pos2(cx - x, center.y + x), pos2(cx + x, center.y - x)], s);
+        return;
+    }
     let segs = segments(text);
     let galleys: Vec<_> = segs
         .iter()
         .map(|s| {
             let (t, sz) = match s {
-                Seg::Super(t) => (*t, size * 0.68),
+                Seg::Super(t) | Seg::Sub(t) => (*t, size * 0.68),
                 Seg::Normal(t) | Seg::Over(t) => (*t, size),
             };
             p.layout_no_wrap(t.to_string(), FontId::new(sz, font.family.clone()), color)
@@ -201,6 +257,7 @@ pub fn rich_label(p: &Painter, center: Pos2, text: &str, font: FontId, color: Co
     for (s, g) in segs.iter().zip(galleys) {
         let y = match s {
             Seg::Super(_) => top - size * 0.12,
+            Seg::Sub(_) => top + size * 0.42,
             _ => top,
         };
         let w = g.size().x;
@@ -290,5 +347,7 @@ mod tests {
         let s = segments("~{x}^{2}");
         assert!(matches!(s[..], [Seg::Over("x"), Seg::Super("2")]));
         assert!(matches!(segments("sin")[..], [Seg::Normal("sin")]));
+        let s = segments("flip_{16}");
+        assert!(matches!(s[..], [Seg::Normal("flip"), Seg::Sub("16")]));
     }
 }

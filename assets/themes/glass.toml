@@ -14,6 +14,8 @@ background = ["#eef3f9c4", "#dfe7f1bc"]
 background = "#00000000"
 hover = "#ffffff80"
 hover_border = "#ffffffa0"
+# Menus and Preferences are translucent, like the window.
+popup_background = "#fbfbfbd9"
 
 [display]
 background = ["#ffffffe0", "#f6f9fcd8"]

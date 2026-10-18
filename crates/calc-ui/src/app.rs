@@ -5,10 +5,10 @@ use crate::layout;
 use crate::menu::MenuCommand;
 use crate::paint;
 use crate::{Platform, i18n::tr};
-use calc_config::Settings;
+use calc_config::{DEFAULT_SCALE, Settings};
 use calc_core::{Calculator, Key, Mode};
 use calc_format::Locale;
-use calc_theme::{Backdrop, Color, Theme, ThemeStore};
+use calc_theme::{Backdrop, Color, KeyLayout, Theme, ThemeStore};
 use eframe::egui::{
     self, Color32, Context, FontData, FontDefinitions, FontFamily, FontId, Pos2, Rect, Stroke,
     TextStyle, UiBuilder, Vec2, ViewportCommand, vec2,
@@ -43,10 +43,96 @@ pub struct AppInit {
     pub platform: Box<dyn Platform>,
 }
 
+/// How much smaller than the body's points menus and dialogs are drawn: they stay at
+/// [`DEFAULT_SCALE`] on screen whatever the window's zoom.
+pub(crate) fn chrome_k(ctx: &Context) -> f32 {
+    DEFAULT_SCALE / ctx.zoom_factor()
+}
+
+/// `style` shrunk by `zoom`, so that drawn at that zoom it looks as at scale 1.0. egui
+/// zooms a whole window at once; this undoes it for everything that uses the shared
+/// style (menus, dialogs, tooltips) while the calculator body, which draws with the
+/// theme's sizes, keeps scaling.
+pub(crate) fn unzoomed(style: &egui::Style, zoom: f32) -> egui::Style {
+    let k = 1.0 / zoom;
+    let m = |m: egui::Margin| egui::Margin {
+        left: (m.left as f32 * k).round() as i8,
+        right: (m.right as f32 * k).round() as i8,
+        top: (m.top as f32 * k).round() as i8,
+        bottom: (m.bottom as f32 * k).round() as i8,
+    };
+    let r = |r: egui::CornerRadius| egui::CornerRadius {
+        nw: (r.nw as f32 * k).round() as u8,
+        ne: (r.ne as f32 * k).round() as u8,
+        sw: (r.sw as f32 * k).round() as u8,
+        se: (r.se as f32 * k).round() as u8,
+    };
+    let shadow = |s: egui::epaint::Shadow| egui::epaint::Shadow {
+        offset: s.offset.map(|o| (o as f32 * k).round() as i8),
+        blur: (s.blur as f32 * k).round() as u8,
+        spread: (s.spread as f32 * k).round() as u8,
+        ..s
+    };
+    let mut s = style.clone();
+    for f in s.text_styles.values_mut() {
+        f.size *= k;
+    }
+    let sp = &mut s.spacing;
+    sp.item_spacing *= k;
+    sp.window_margin = m(sp.window_margin);
+    sp.button_padding *= k;
+    sp.menu_margin = m(sp.menu_margin);
+    sp.indent *= k;
+    sp.interact_size *= k;
+    sp.slider_width *= k;
+    sp.slider_rail_height *= k;
+    sp.combo_width *= k;
+    sp.text_edit_width *= k;
+    sp.icon_width *= k;
+    sp.icon_width_inner *= k;
+    sp.icon_spacing *= k;
+    sp.default_area_size *= k;
+    sp.tooltip_width *= k;
+    sp.menu_width *= k;
+    sp.menu_spacing *= k;
+    sp.combo_height *= k;
+    let sc = &mut sp.scroll;
+    sc.bar_width *= k;
+    sc.handle_min_length *= k;
+    sc.bar_inner_margin *= k;
+    sc.bar_outer_margin *= k;
+    sc.floating_width *= k;
+    sc.floating_allocated_width *= k;
+    let v = &mut s.visuals;
+    v.window_corner_radius = r(v.window_corner_radius);
+    v.menu_corner_radius = r(v.menu_corner_radius);
+    v.window_shadow = shadow(v.window_shadow);
+    v.popup_shadow = shadow(v.popup_shadow);
+    v.window_stroke.width *= k;
+    for w in [
+        &mut v.widgets.noninteractive,
+        &mut v.widgets.inactive,
+        &mut v.widgets.hovered,
+        &mut v.widgets.active,
+        &mut v.widgets.open,
+    ] {
+        w.corner_radius = r(w.corner_radius);
+        w.bg_stroke.width *= k;
+        w.fg_stroke.width *= k;
+        w.expansion *= k;
+    }
+    s
+}
+
 /// Window inner size for the given theme and settings, at scale 1.0.
 pub fn window_size(t: &Theme, s: &Settings, native_menu: bool) -> Vec2 {
     let history = s.history && matches!(s.mode, Mode::Standard | Mode::Scientific);
-    layout::compute(t, s.mode, history, s.extras, !native_menu).size
+    let menu_h = if native_menu {
+        0.0
+    } else {
+        layout::menu_bar_h(t, 1.0)
+    };
+    layout::compute(t, s.mode, history, s.extras, menu_h).size
 }
 
 /// Loads the theme the settings ask for, falling back to the default (THM-004).
@@ -82,6 +168,14 @@ pub struct App {
     /// Requested physical window size and when it was requested; the scale is frozen
     /// until the window reaches it so a mode switch doesn't change the zoom.
     pending_size: Option<(Vec2, f64)>,
+    /// The egui style at scale 1.0, from the theme. The calculator body scales with
+    /// the window; menus, dialogs and tooltips keep this size (see [`unzoomed`]).
+    pub(crate) body_style: Arc<egui::Style>,
+    /// Zoom the shared style was last adjusted for.
+    style_zoom: f32,
+    /// Zoom set by Ctrl +/-/0. egui applies it from the next pass, so the window is
+    /// resized to match only once it is in effect.
+    zoom_to: Option<f32>,
     pub(crate) extras: ExtrasState,
     pub(crate) about_open: bool,
     pub(crate) licenses_open: bool,
@@ -137,6 +231,9 @@ impl App {
             blur_applied: None,
             focused: true,
             last_size: None,
+            zoom_to: None,
+            body_style: Arc::default(),
+            style_zoom: 0.0,
             pending_size: None,
             extras: ExtrasState::default(),
             about_open: false,
@@ -256,6 +353,20 @@ impl App {
             v.window_fill = col(t.menu.popup_background);
             v.panel_fill = bg;
             v.window_stroke = Stroke::new(1.0, col(t.menu.popup_border));
+            if t.layout == KeyLayout::Mac {
+                // macOS menus and windows have soft, round corners.
+                v.window_corner_radius = egui::CornerRadius::same(12);
+                v.menu_corner_radius = egui::CornerRadius::same(10);
+                for w in [
+                    &mut v.widgets.noninteractive,
+                    &mut v.widgets.inactive,
+                    &mut v.widgets.hovered,
+                    &mut v.widgets.active,
+                    &mut v.widgets.open,
+                ] {
+                    w.corner_radius = egui::CornerRadius::same(6);
+                }
+            }
             v.extreme_bg_color = col(c.background);
             v.text_edit_bg_color = Some(col(c.background));
             v.selection.bg_fill = col(t.display.selection);
@@ -284,7 +395,19 @@ impl App {
                 .text_styles
                 .insert(TextStyle::Heading, FontId::proportional(ui_size * 1.4));
         });
+        self.body_style = ctx.global_style();
+        self.style_zoom = 0.0;
         self.last_size = None;
+    }
+
+    /// Keeps menus, dialogs and tooltips at [`DEFAULT_SCALE`] whatever the zoom.
+    fn sync_style_zoom(&mut self, ctx: &Context) {
+        let zoom = ctx.zoom_factor();
+        if (zoom - self.style_zoom).abs() > 1e-3 {
+            let style = unzoomed(&self.body_style, zoom / DEFAULT_SCALE);
+            ctx.all_styles_mut(|s| *s = style.clone());
+            self.style_zoom = zoom;
+        }
     }
 
     /// Re-selects and reloads the theme when the selection, the OS light/dark or
@@ -422,11 +545,7 @@ impl App {
             MenuCommand::OpenSettingsFolder => open_path(&calc_config::config_dir()),
             MenuCommand::ZoomIn => self.zoom_by(ctx, 1.1),
             MenuCommand::ZoomOut => self.zoom_by(ctx, 1.0 / 1.1),
-            MenuCommand::ResetSize => {
-                ctx.set_zoom_factor(1.0);
-                self.settings.scale = 1.0;
-                self.last_size = None;
-            }
+            MenuCommand::ResetSize => self.zoom_to(ctx, DEFAULT_SCALE),
             MenuCommand::Copy => ctx.copy_text(self.copy_text()),
             MenuCommand::Paste => ctx.send_viewport_cmd(ViewportCommand::RequestPaste),
             MenuCommand::CopyHistory => {
@@ -449,16 +568,32 @@ impl App {
 
     /// Multiplies the UI scale (DPI-009): the window grows or shrinks to match.
     pub(crate) fn zoom_by(&mut self, ctx: &Context, factor: f32) {
-        let k = (ctx.zoom_factor() * factor).clamp(MIN_SCALE, MAX_SCALE);
+        // Builds on a zoom still waiting to apply, so quick repeats all count.
+        let k = self.zoom_to.unwrap_or_else(|| ctx.zoom_factor()) * factor;
+        self.zoom_to(ctx, k);
+    }
+
+    fn zoom_to(&mut self, ctx: &Context, k: f32) {
+        let k = k.clamp(MIN_SCALE, MAX_SCALE);
         ctx.set_zoom_factor(k);
         self.settings.scale = (k * 100.0).round() / 100.0;
-        self.last_size = None;
+        self.zoom_to = Some(k);
     }
 
     /// Keeps the zoom factor in step with the window size, so resizing scales the whole UI
     /// uniformly. `natural` is the window size at scale 1.0.
     fn update_scale(&mut self, ctx: &Context, natural: Vec2) {
         let now = ctx.input(|i| i.time);
+        if let Some(k) = self.zoom_to {
+            // Until the new zoom is in effect, a resize would use the old one and the
+            // window would keep its size, which then fits the zoom back.
+            if (ctx.zoom_factor() - k).abs() > 0.001 {
+                ctx.request_repaint();
+                return;
+            }
+            self.zoom_to = None;
+            self.last_size = None;
+        }
         if self.last_size != Some(natural) {
             self.request_size(ctx, natural, now);
         }
@@ -642,16 +777,10 @@ impl eframe::App for App {
             self.command(&ctx, cmd);
         }
         self.handle_keys(&ctx);
+        self.sync_style_zoom(&ctx);
         let native_menu = self.platform.native_menu();
         let history =
             self.settings.history && matches!(self.calc.mode, Mode::Standard | Mode::Scientific);
-        let l = layout::compute(
-            &self.theme,
-            self.calc.mode,
-            history,
-            self.settings.extras,
-            !native_menu,
-        );
         let want = window_size(
             &self.theme,
             &Settings {
@@ -663,11 +792,23 @@ impl eframe::App for App {
         self.update_scale(&ctx, want);
 
         let client = ui.max_rect();
+        let l = layout::fill(
+            &self.theme,
+            self.calc.mode,
+            history,
+            self.settings.extras,
+            if native_menu {
+                0.0
+            } else {
+                layout::menu_bar_h(&self.theme, ctx.zoom_factor())
+            },
+            client.size(),
+        );
         self.sync_blur(frame);
         paint::gradient_rect(ui.painter(), client, 0.0, &self.window_background());
         self.draw_imagery(ui, client);
-        // When the window's aspect differs from the calculator's, center the body below a
-        // full-width menu bar.
+        // The layout fills the window; any rest (rounding, a fixed-height extras panel)
+        // is split evenly around the body, below a full-width menu bar.
         let spare = ((client.size() - l.size) / 2.0).max(Vec2::ZERO);
         let off = client.min.to_vec2() + spare;
         let menu = Rect::from_min_size(client.min, vec2(client.width(), l.menu.height()));
@@ -676,7 +817,18 @@ impl eframe::App for App {
         let radios: Vec<Rect> = l.radios.iter().map(|r| r.translate(off)).collect();
         self.draw_radios(ui, &radios);
         if let Some(r) = l.tools {
-            self.draw_tools(ui, r.translate(off));
+            let r = r.translate(off);
+            if self.theme.layout == KeyLayout::Mac {
+                // A hairline under the display, above the toolbar, as on the Mac.
+                let d = l.display.translate(off);
+                let y = r.top() - self.theme.spacing.padding / 2.0;
+                ui.painter().hline(
+                    d.x_range(),
+                    y.round() + 0.5,
+                    Stroke::new(1.0, paint::c(self.theme.controls.group_border)),
+                );
+            }
+            self.draw_tools(ui, r);
         }
         if let Some(b) = l.bits {
             self.draw_bits(ui, b.translate(off));
@@ -695,7 +847,10 @@ impl eframe::App for App {
             let which = self.settings.extras;
             let grouping = self.settings.digit_grouping;
             let locale = self.locale();
+            let body_style = self.body_style.clone();
             ui.scope_builder(UiBuilder::new().max_rect(r.shrink2(vec2(4.0, 0.0))), |ui| {
+                // Part of the calculator body: scales with the window.
+                ui.set_style(body_style);
                 crate::extras::show(ui, which, &mut self.extras, grouping, &locale);
             });
         }

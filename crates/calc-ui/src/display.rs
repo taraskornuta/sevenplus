@@ -6,6 +6,7 @@ use crate::layout::line_h;
 use crate::paint::{self, c};
 use calc_core::{Angle, Base, Mode, Num, WordSize};
 use calc_format::{FormatSettings, Notation, Value, format};
+use calc_theme::KeyLayout;
 use eframe::egui::{
     self, Align2, FontId, Id, Painter, Rect, Sense, Stroke, StrokeKind, WidgetInfo, WidgetType,
     pos2, vec2,
@@ -239,15 +240,30 @@ impl App {
             Some(e) => error_text(e),
             None => state.text(grouping, &locale),
         };
-        let avail = value_rect.width() - reserved;
+        // macOS layout: the radix follows the value as a subscript, e.g. 1F308₁₆.
+        let radix = (self.theme.layout == KeyLayout::Mac
+            && self.calc.mode == Mode::Programmer
+            && state.error.is_none())
+        .then(|| {
+            let size = (fonts.display.size * 0.4).max(9.0);
+            let font = FontId::new(size, paint::font(fonts.display).family);
+            p.layout_no_wrap(self.calc.base.radix().to_string(), font, c(d.text))
+        });
+        let suffix_w = radix.as_ref().map_or(0.0, |g| g.size().x + 2.0);
+        let avail = value_rect.width() - reserved - suffix_w;
         let (text, font) = fit_value(&p, &state, text, fonts.display, avail, grouping, &locale);
-        p.with_clip_rect(value_rect).text(
-            value_rect.right_center() - vec2(1.0, 0.0),
-            Align2::RIGHT_CENTER,
-            &text,
-            font,
-            c(d.text),
-        );
+        let g = paint::tracked(&p, &text, font, c(d.text));
+        let right = value_rect.right() - 1.0 - suffix_w;
+        let at = pos2(right - g.size().x, value_rect.center().y - g.size().y / 2.0);
+        let value_bottom = at.y + g.size().y;
+        p.with_clip_rect(value_rect).galley(at, g, c(d.text));
+        if let Some(r) = radix {
+            // Sits on the value's baseline, a little below it, but never below the
+            // value line, where it would be clipped.
+            let y = (value_bottom - r.size().y * 0.85).min(value_rect.bottom() - r.size().y);
+            let pos = pos2(right + 2.0, y);
+            p.with_clip_rect(value_rect).galley(pos, r, c(d.text));
+        }
 
         // Double-click copies the value. CLICK without FOCUSABLE keeps the Tab order.
         let resp = ui
@@ -285,13 +301,9 @@ fn fit_value(
     locale: &calc_format::Locale,
 ) -> (String, FontId) {
     let width = |t: &str, size: f32| {
-        p.layout_no_wrap(
-            t.to_string(),
-            paint::font_sized(role, size),
-            egui::Color32::WHITE,
-        )
-        .size()
-        .x
+        paint::tracked(p, t, paint::font_sized(role, size), egui::Color32::WHITE)
+            .size()
+            .x
     };
     let min = role.size * 0.5;
     let mut size = role.size;

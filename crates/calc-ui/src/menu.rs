@@ -6,7 +6,10 @@ use crate::i18n::tr;
 use crate::paint::{self, c};
 use calc_config::{Extras, SYSTEM_THEME};
 use calc_core::Mode;
-use eframe::egui::{self, Button, Rect, Stroke, UiBuilder};
+use eframe::egui::{
+    self, Button, Rect, Stroke, UiBuilder, WidgetInfo, WidgetType, containers::menu::MenuButton,
+    pos2, vec2,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MenuCommand {
@@ -91,6 +94,21 @@ pub fn shortcut(keys: &str) -> String {
     }
 }
 
+fn help_menu(ui: &mut egui::Ui) -> Option<MenuCommand> {
+    let mut out = None;
+    if ui.button(tr("help-view")).clicked() {
+        out = Some(MenuCommand::Help);
+    }
+    ui.separator();
+    if ui.button(tr("help-licenses")).clicked() {
+        out = Some(MenuCommand::Licenses);
+    }
+    if ui.button(tr("help-about")).clicked() {
+        out = Some(MenuCommand::About);
+    }
+    out
+}
+
 fn item(ui: &mut egui::Ui, selected: bool, label: &str, keys: &str) -> bool {
     ui.add(Button::selectable(selected, label).shortcut_text(shortcut(keys)))
         .clicked()
@@ -102,25 +120,32 @@ impl App {
         paint::gradient_rect(ui.painter(), rect, 0.0, m.background.stops());
         let mut chosen = None;
         ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
+            // The shared style, sized like the menus it opens; the window's root Ui
+            // still has the style it was created with.
+            ui.set_style(ui.ctx().global_style());
             ui.visuals_mut().override_text_color = Some(c(m.text));
             ui.visuals_mut().widgets.hovered.weak_bg_fill = c(m.hover);
             ui.visuals_mut().widgets.hovered.bg_stroke = Stroke::new(1.0, c(m.hover_border));
             ui.visuals_mut().widgets.open.weak_bg_fill = c(m.hover);
             egui::MenuBar::new().ui(ui, |ui| {
-                ui.menu_button(tr("menu-view"), |ui| chosen = self.view_menu(ui));
-                ui.menu_button(tr("menu-edit"), |ui| chosen = self.edit_menu(ui));
-                ui.menu_button(tr("menu-help"), |ui| {
-                    if ui.button(tr("help-view")).clicked() {
-                        chosen = Some(MenuCommand::Help);
-                    }
-                    ui.separator();
-                    if ui.button(tr("help-licenses")).clicked() {
-                        chosen = Some(MenuCommand::Licenses);
-                    }
-                    if ui.button(tr("help-about")).clicked() {
-                        chosen = Some(MenuCommand::About);
-                    }
+                // One ☰ button holds every menu. Inter has no ☰ glyph, so it is drawn.
+                // The bar keeps one size on screen, like the menu it opens.
+                let h = (rect.height() - 4.0).max(10.0);
+                let button = Button::new("").min_size(vec2(h * 1.3, h));
+                let (resp, _) = MenuButton::from_button(button).ui(ui, |ui| {
+                    chosen = self.main_menu(ui);
                 });
+                let label = tr("menu-main");
+                resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
+                // About 16 px wide with 2 px lines, like other apps' menu icons.
+                let (center, w) = (resp.rect.center(), h * 0.38);
+                let stroke = Stroke::new(2.0 * crate::app::chrome_k(ui.ctx()), c(m.text));
+                for dy in [-h * 0.24, 0.0, h * 0.24] {
+                    let y = (center.y + dy).round();
+                    ui.painter()
+                        .line_segment([pos2(center.x - w, y), pos2(center.x + w, y)], stroke);
+                }
+                resp.on_hover_text(label);
             });
         });
         if let Some(cmd) = chosen {
@@ -129,63 +154,39 @@ impl App {
         }
     }
 
-    fn view_menu(&self, ui: &mut egui::Ui) -> Option<MenuCommand> {
+    /// The ☰ menu: modes, then short submenus, so it fits even the smallest window.
+    fn main_menu(&self, ui: &mut egui::Ui) -> Option<MenuCommand> {
         let mut out = None;
-        let mut pick = |cond: bool, cmd: MenuCommand| {
-            if cond {
-                out = Some(cmd);
-            }
-        };
         for (mode, id, digit) in MODES {
-            pick(
-                item(ui, self.calc.mode == mode, &tr(id), &format!("Alt+{digit}")),
-                MenuCommand::Mode(mode),
-            );
+            if item(ui, self.calc.mode == mode, &tr(id), &format!("Alt+{digit}")) {
+                out = Some(MenuCommand::Mode(mode));
+            }
         }
         ui.separator();
-        let history_ok = matches!(self.calc.mode, Mode::Standard | Mode::Scientific);
-        pick(
-            ui.add_enabled(
-                history_ok,
-                Button::selectable(self.settings.history, tr("view-history"))
-                    .shortcut_text(shortcut("Ctrl+H")),
-            )
-            .clicked(),
-            MenuCommand::ToggleHistory,
-        );
-        pick(
-            item(
-                ui,
-                self.settings.digit_grouping,
-                &tr("view-digit-grouping"),
-                "",
-            ),
-            MenuCommand::ToggleGrouping,
-        );
+        ui.menu_button(tr("menu-tools"), |ui| out = self.tools_menu(ui));
+        ui.menu_button(tr("menu-view"), |ui| out = self.view_menu(ui));
+        ui.menu_button(tr("menu-edit"), |ui| out = edit_menu(ui));
         ui.separator();
+        if item(ui, false, &tr("edit-preferences"), "Ctrl+,") {
+            out = Some(MenuCommand::Preferences);
+        }
+        ui.menu_button(tr("menu-help"), |ui| out = help_menu(ui));
+        out
+    }
+
+    /// Unit conversion, date calculation and worksheets beside the keypad.
+    fn tools_menu(&self, ui: &mut egui::Ui) -> Option<MenuCommand> {
+        let mut out = None;
         let ex = self.settings.extras;
-        pick(
-            item(ui, ex == Extras::None, &tr("view-basic"), "Ctrl+F4"),
-            MenuCommand::Extras(Extras::None),
-        );
-        pick(
-            item(
-                ui,
-                ex == Extras::Units,
-                &tr("view-unit-conversion"),
-                "Ctrl+U",
-            ),
-            MenuCommand::Extras(Extras::Units),
-        );
-        pick(
-            item(
-                ui,
-                ex == Extras::Date,
-                &tr("view-date-calculation"),
-                "Ctrl+E",
-            ),
-            MenuCommand::Extras(Extras::Date),
-        );
+        for (e, id, keys) in [
+            (Extras::None, "view-basic", "Ctrl+F4"),
+            (Extras::Units, "view-unit-conversion", "Ctrl+U"),
+            (Extras::Date, "view-date-calculation", "Ctrl+E"),
+        ] {
+            if item(ui, ex == e, &tr(id), keys) {
+                out = Some(MenuCommand::Extras(e));
+            }
+        }
         ui.menu_button(tr("view-worksheets"), |ui| {
             for (e, id) in WORKSHEETS {
                 if item(ui, ex == e, &tr(id), "") {
@@ -193,6 +194,30 @@ impl App {
                 }
             }
         });
+        out
+    }
+
+    fn view_menu(&self, ui: &mut egui::Ui) -> Option<MenuCommand> {
+        let mut out = None;
+        let history_ok = matches!(self.calc.mode, Mode::Standard | Mode::Scientific);
+        if ui
+            .add_enabled(
+                history_ok,
+                Button::selectable(self.settings.history, tr("view-history"))
+                    .shortcut_text(shortcut("Ctrl+H")),
+            )
+            .clicked()
+        {
+            out = Some(MenuCommand::ToggleHistory);
+        }
+        if item(
+            ui,
+            self.settings.digit_grouping,
+            &tr("view-digit-grouping"),
+            "",
+        ) {
+            out = Some(MenuCommand::ToggleGrouping);
+        }
         ui.separator();
         ui.menu_button(tr("view-themes"), |ui| {
             if item(
@@ -217,48 +242,37 @@ impl App {
                 out = Some(MenuCommand::OpenThemesFolder);
             }
         });
-        let mut pick = |cond: bool, cmd: MenuCommand| {
-            if cond {
+        ui.separator();
+        for (id, keys, cmd) in [
+            ("view-zoom-in", "Ctrl++", MenuCommand::ZoomIn),
+            ("view-zoom-out", "Ctrl+-", MenuCommand::ZoomOut),
+            ("view-reset-size", "Ctrl+0", MenuCommand::ResetSize),
+        ] {
+            if item(ui, false, &tr(id), keys) {
                 out = Some(cmd);
             }
-        };
-        pick(
-            item(ui, false, &tr("view-zoom-in"), "Ctrl++"),
-            MenuCommand::ZoomIn,
-        );
-        pick(
-            item(ui, false, &tr("view-zoom-out"), "Ctrl+-"),
-            MenuCommand::ZoomOut,
-        );
-        pick(
-            item(ui, false, &tr("view-reset-size"), "Ctrl+0"),
-            MenuCommand::ResetSize,
-        );
+        }
         out
     }
+}
 
-    fn edit_menu(&self, ui: &mut egui::Ui) -> Option<MenuCommand> {
-        let mut out = None;
-        if item(ui, false, &tr("edit-copy"), "Ctrl+C") {
-            out = Some(MenuCommand::Copy);
-        }
-        if item(ui, false, &tr("edit-paste"), "Ctrl+V") {
-            // Clipboard contents arrive as a paste event on the next frame.
-            out = Some(MenuCommand::Paste);
-        }
-        ui.separator();
-        ui.menu_button(tr("edit-history"), |ui| {
-            if item(ui, false, &tr("history-copy"), "") {
-                out = Some(MenuCommand::CopyHistory);
-            }
-            if item(ui, false, &tr("history-clear"), "Ctrl+Shift+D") {
-                out = Some(MenuCommand::ClearHistory);
-            }
-        });
-        ui.separator();
-        if item(ui, false, &tr("edit-preferences"), "Ctrl+,") {
-            out = Some(MenuCommand::Preferences);
-        }
-        out
+fn edit_menu(ui: &mut egui::Ui) -> Option<MenuCommand> {
+    let mut out = None;
+    if item(ui, false, &tr("edit-copy"), "Ctrl+C") {
+        out = Some(MenuCommand::Copy);
     }
+    if item(ui, false, &tr("edit-paste"), "Ctrl+V") {
+        // Clipboard contents arrive as a paste event on the next frame.
+        out = Some(MenuCommand::Paste);
+    }
+    ui.separator();
+    ui.menu_button(tr("edit-history"), |ui| {
+        if item(ui, false, &tr("history-copy"), "") {
+            out = Some(MenuCommand::CopyHistory);
+        }
+        if item(ui, false, &tr("history-clear"), "Ctrl+Shift+D") {
+            out = Some(MenuCommand::ClearHistory);
+        }
+    });
+    out
 }

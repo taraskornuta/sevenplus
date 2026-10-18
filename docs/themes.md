@@ -4,7 +4,7 @@ A theme is a TOML file of design tokens. Every built-in theme is a file in [`ass
 
 ## Making a theme
 
-1. Open **View ▸ Themes ▸ Open themes folder**.
+1. Open **☰ ▸ Themes ▸ Open themes folder**.
 2. Create a file such as `ocean.toml`:
 
    ```toml
@@ -21,7 +21,7 @@ A theme is a TOML file of design tokens. Every built-in theme is a file in [`ass
    text = "#ffffff"
    ```
 
-3. Choose **Ocean** in **View ▸ Themes**. When you edit the file, the calculator reloads it the next time its window gets focus. `Ctrl+Shift+R` rescans the folder.
+3. Choose **Ocean** in **☰ ▸ Themes**. When you edit the file, the calculator reloads it the next time its window gets focus. `Ctrl+Shift+R` rescans the folder.
 
 A theme only needs the tokens it changes. Everything else comes from the theme it `extends` (THM-006). A user file can also replace a built-in theme by using the same name, e.g. `dark.toml`. `extends = "dark"` inside it then refers to the built-in Dark theme.
 
@@ -29,7 +29,7 @@ A theme only needs the tokens it changes. Everything else comes from the theme i
 
 | Table | Tokens |
 |---|---|
-| top level | `schema` (must be 1), `name`, `extends`, `backdrop`: `"system"` makes the window see-through with the desktop blurred behind it (the `[window]` background's alpha, times the opacity setting, sets how much shows through); `"solid"` makes it opaque. Aero 7 is `"system"`, so themes that extend it inherit glass unless they set `"solid"`. |
+| top level | `schema` (must be 1), `name`, `extends`, `backdrop`: `"system"` makes the window see-through with the desktop blurred behind it (the `[window]` background's alpha, times the opacity setting, sets how much shows through); `"solid"` makes it opaque. Aero 7 is `"system"`, so themes that extend it inherit glass unless they set `"solid"`. `layout`: `"classic"` (default) keeps the Windows 7 key arrangement; `"mac"` uses the macOS Calculator's: one block per mode with `÷ × − + =` in the right column, segmented controls for the angle unit, radix and word size, and the radix shown after the Programmer value (`1F308₁₆`). The macOS theme uses `"mac"`. Keys without a button in it stay on the keyboard. |
 | `[font]` | `file`, `bold_file`: font paths, relative to the themes folder. Empty uses the bundled Inter. |
 | `[font.<role>]` | `size` (logical px), `weight` (`"regular"` or `"bold"`). Roles: `ui`, `button`, `display`, `expression`, `indicator`, `history`, `bits`, `caption` |
 | `[spacing]` | `padding`, `gap`, `button_width`, `button_height` |

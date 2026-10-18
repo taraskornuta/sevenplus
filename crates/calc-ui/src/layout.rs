@@ -1,9 +1,9 @@
 //! Layout tables (UI-001): the button grids of the four modes and where each part of
 //! the window goes. Sizes come from the theme's spacing tokens, in logical px.
 
-use calc_config::Extras;
+use calc_config::{DEFAULT_SCALE, Extras};
 use calc_core::{BinOp, Func, Key, Mode, StatFn};
-use calc_theme::{Group as Kind, Theme};
+use calc_theme::{Group as Kind, KeyLayout, Theme};
 use eframe::egui::{Pos2, Rect, Vec2, pos2, vec2};
 
 /// One on-screen button.
@@ -252,6 +252,185 @@ pub const STATISTICS: &[Button] = &[
     k(".", Key::Point, Digit, 4, 4),
 ];
 
+// ---- macOS Calculator arrangement (theme `layout = "mac"`) -----------------------------
+// Only `÷ × − + =` use the operator (accent) style; the edit keys (⌫, AC, %) use the
+// memory style, which the macOS theme draws lighter, as the Mac does. Keys without a
+// button here stay on the keyboard (docs/keyboard.md).
+
+/// Standard keys, 4×5; also the right block of Scientific.
+pub const MAC_STANDARD: &[Button] = &[
+    k("⌫", Key::Back, Memory, 0, 0),
+    k("AC", Key::Clear, Memory, 1, 0),
+    k("%", Key::Percent, Memory, 2, 0),
+    k("÷", Key::Op(BinOp::Div), Operator, 3, 0),
+    d(7, 0, 1),
+    d(8, 1, 1),
+    d(9, 2, 1),
+    k("×", Key::Op(BinOp::Mul), Operator, 3, 1),
+    d(4, 0, 2),
+    d(5, 1, 2),
+    d(6, 2, 2),
+    k("−", Key::Op(BinOp::Sub), Operator, 3, 2),
+    d(1, 0, 3),
+    d(2, 1, 3),
+    d(3, 2, 3),
+    k("+", Key::Op(BinOp::Add), Operator, 3, 3),
+    k("±", Key::Negate, Function, 0, 4),
+    d(0, 1, 4),
+    k(".", Key::Point, Digit, 2, 4),
+    k("=", Key::Equals, Equals, 3, 4),
+];
+
+/// Scientific functions, 6×5, left of [`MAC_STANDARD`].
+pub const MAC_SCIENTIFIC: &[Button] = &[
+    k("(", Key::OpenParen, Function, 0, 0),
+    k(")", Key::CloseParen, Function, 1, 0),
+    k("mc", Key::MemClear, Function, 2, 0),
+    k("m+", Key::MemAdd, Function, 3, 0),
+    k("m−", Key::MemSub, Function, 4, 0),
+    k("mr", Key::MemRecall, Function, 5, 0),
+    k("2^{nd}", Key::Inv, Function, 0, 1),
+    ki(
+        "x^{2}",
+        Key::Func(Func::Square),
+        ("√x", Key::Func(Func::Sqrt)),
+        1,
+        1,
+    ),
+    ki(
+        "x^{3}",
+        Key::Func(Func::Cube),
+        ("^{3}√x", Key::Func(Func::CubeRoot)),
+        2,
+        1,
+    ),
+    k("x^{y}", Key::Op(BinOp::Pow), Function, 3, 1),
+    ki(
+        "e^{x}",
+        Key::Func(Func::ExpE),
+        ("ln", Key::Func(Func::Ln)),
+        4,
+        1,
+    ),
+    k("10^{x}", Key::Func(Func::Pow10), Function, 5, 1),
+    k("1/x", Key::Func(Func::Reciprocal), Function, 0, 2),
+    k("√x", Key::Func(Func::Sqrt), Function, 1, 2),
+    k("^{3}√x", Key::Func(Func::CubeRoot), Function, 2, 2),
+    k("^{y}√x", Key::Op(BinOp::Root), Function, 3, 2),
+    ki(
+        "ln",
+        Key::Func(Func::Ln),
+        ("e^{x}", Key::Func(Func::ExpE)),
+        4,
+        2,
+    ),
+    k("log", Key::Func(Func::Log), Function, 5, 2),
+    k("x!", Key::Func(Func::Fact), Function, 0, 3),
+    ki(
+        "sin",
+        Key::Func(Func::Sin),
+        ("sin^{-1}", Key::Func(Func::Asin)),
+        1,
+        3,
+    ),
+    ki(
+        "cos",
+        Key::Func(Func::Cos),
+        ("cos^{-1}", Key::Func(Func::Acos)),
+        2,
+        3,
+    ),
+    ki(
+        "tan",
+        Key::Func(Func::Tan),
+        ("tan^{-1}", Key::Func(Func::Atan)),
+        3,
+        3,
+    ),
+    k("Mod", Key::Op(BinOp::Mod), Function, 4, 3),
+    k("EE", Key::Exp, Function, 5, 3),
+    ki(
+        "dms",
+        Key::Func(Func::Dms),
+        ("deg", Key::Func(Func::Degrees)),
+        0,
+        4,
+    ),
+    ki(
+        "sinh",
+        Key::Func(Func::Sinh),
+        ("sinh^{-1}", Key::Func(Func::Asinh)),
+        1,
+        4,
+    ),
+    ki(
+        "cosh",
+        Key::Func(Func::Cosh),
+        ("cosh^{-1}", Key::Func(Func::Acosh)),
+        2,
+        4,
+    ),
+    ki(
+        "tanh",
+        Key::Func(Func::Tanh),
+        ("tanh^{-1}", Key::Func(Func::Atanh)),
+        3,
+        4,
+    ),
+    ki("π", Key::Pi, ("2*π", Key::Pi), 4, 4),
+    ki(
+        "Int",
+        Key::Func(Func::Int),
+        ("Frac", Key::Func(Func::Frac)),
+        5,
+        4,
+    ),
+];
+
+/// Programmer keys, 7×6: bitwise operators left, hex digits above the digit block.
+pub const MAC_PROGRAMMER: &[Button] = &[
+    k("⌫", Key::Back, Memory, 0, 0),
+    k("(", Key::OpenParen, Function, 1, 0),
+    k(")", Key::CloseParen, Function, 2, 0),
+    d(13, 3, 0),
+    d(14, 4, 0),
+    d(15, 5, 0),
+    k("AC", Key::Clear, Memory, 6, 0),
+    k("And", Key::Op(BinOp::And), Function, 0, 1),
+    k("Or", Key::Op(BinOp::Or), Function, 1, 1),
+    k("Xor", Key::Op(BinOp::Xor), Function, 2, 1),
+    d(10, 3, 1),
+    d(11, 4, 1),
+    d(12, 5, 1),
+    k("÷", Key::Op(BinOp::Div), Operator, 6, 1),
+    k("Not", Key::Func(Func::Not), Function, 0, 2),
+    k("Lsh", Key::Op(BinOp::Lsh), Function, 1, 2),
+    k("Rsh", Key::Op(BinOp::Rsh), Function, 2, 2),
+    d(7, 3, 2),
+    d(8, 4, 2),
+    d(9, 5, 2),
+    k("×", Key::Op(BinOp::Mul), Operator, 6, 2),
+    k("Mod", Key::Op(BinOp::Mod), Function, 0, 3),
+    k("RoL", Key::Func(Func::RoL), Function, 1, 3),
+    k("RoR", Key::Func(Func::RoR), Function, 2, 3),
+    d(4, 3, 3),
+    d(5, 4, 3),
+    d(6, 5, 3),
+    k("−", Key::Op(BinOp::Sub), Operator, 6, 3),
+    k("±", Key::Negate, Function, 0, 4),
+    k("flip_{8}", Key::Func(Func::ByteFlip), Function, 1, 4),
+    k("flip_{16}", Key::Func(Func::WordFlip), Function, 2, 4),
+    d(1, 3, 4),
+    d(2, 4, 4),
+    d(3, 5, 4),
+    k("+", Key::Op(BinOp::Add), Operator, 6, 4),
+    k("CE", Key::ClearEntry, Function, 0, 5),
+    k("ms", Key::MemStore, Function, 1, 5),
+    k("mr", Key::MemRecall, Function, 2, 5),
+    span(d(0, 3, 5), 3, 1),
+    k("=", Key::Equals, Equals, 6, 5),
+];
+
 /// Fluent id of a key's accessible name (UI-020); digits are read as themselves.
 pub fn a11y_id(key: Key, label: &str) -> Option<&'static str> {
     use Func::*;
@@ -361,6 +540,18 @@ pub enum Side {
     Scientific,
     /// Programmer: radix and word-size radio columns, then a 3×6 block.
     Programmer,
+    /// macOS Scientific: a 6×5 function block beside the keypad, same rows.
+    Functions,
+}
+
+/// Rows of segmented controls between the display and the keys (macOS layout).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Controls {
+    None,
+    /// Angle unit, above the keys.
+    Angle,
+    /// Word size (left) and radix (right), above the bit panel.
+    BaseWord,
 }
 
 /// The list area inside the display.
@@ -376,56 +567,103 @@ pub enum List {
 #[derive(Debug, Clone, Copy)]
 pub struct ModeLayout {
     pub keypad: &'static [Button],
+    pub keypad_cols: u8,
     pub keypad_rows: u8,
     pub side: Side,
     pub side_keys: &'static [Button],
     pub list: List,
     /// Programmer toolbar (text field, endian flips) and bit panel (PRG-005).
     pub bits: bool,
+    pub controls: Controls,
 }
 
 pub const STANDARD_LAYOUT: ModeLayout = ModeLayout {
     keypad: STANDARD,
+    keypad_cols: 5,
     keypad_rows: 6,
     side: Side::None,
     side_keys: &[],
     list: List::History,
     bits: false,
+    controls: Controls::None,
 };
 
 pub const SCIENTIFIC_LAYOUT: ModeLayout = ModeLayout {
     keypad: STANDARD,
+    keypad_cols: 5,
     keypad_rows: 6,
     side: Side::Scientific,
     side_keys: SCIENTIFIC,
     list: List::History,
     bits: false,
+    controls: Controls::None,
 };
 
 pub const PROGRAMMER_LAYOUT: ModeLayout = ModeLayout {
     keypad: STANDARD,
+    keypad_cols: 5,
     keypad_rows: 6,
     side: Side::Programmer,
     side_keys: PROGRAMMER,
     list: List::History,
     bits: true,
+    controls: Controls::None,
 };
 
 pub const STATISTICS_LAYOUT: ModeLayout = ModeLayout {
     keypad: STATISTICS,
+    keypad_cols: 5,
     keypad_rows: 5,
     side: Side::None,
     side_keys: &[],
     list: List::Stats,
     bits: false,
+    controls: Controls::None,
 };
 
-pub fn for_mode(mode: Mode) -> &'static ModeLayout {
-    match mode {
-        Mode::Standard => &STANDARD_LAYOUT,
-        Mode::Scientific => &SCIENTIFIC_LAYOUT,
-        Mode::Programmer => &PROGRAMMER_LAYOUT,
-        Mode::Statistics => &STATISTICS_LAYOUT,
+pub const MAC_STANDARD_LAYOUT: ModeLayout = ModeLayout {
+    keypad: MAC_STANDARD,
+    keypad_cols: 4,
+    keypad_rows: 5,
+    side: Side::None,
+    side_keys: &[],
+    list: List::History,
+    bits: false,
+    controls: Controls::None,
+};
+
+pub const MAC_SCIENTIFIC_LAYOUT: ModeLayout = ModeLayout {
+    keypad: MAC_STANDARD,
+    keypad_cols: 4,
+    keypad_rows: 5,
+    side: Side::Functions,
+    side_keys: MAC_SCIENTIFIC,
+    list: List::History,
+    bits: false,
+    controls: Controls::Angle,
+};
+
+pub const MAC_PROGRAMMER_LAYOUT: ModeLayout = ModeLayout {
+    keypad: MAC_PROGRAMMER,
+    keypad_cols: 7,
+    keypad_rows: 6,
+    side: Side::None,
+    side_keys: &[],
+    list: List::History,
+    bits: true,
+    controls: Controls::BaseWord,
+};
+
+pub fn for_mode(mode: Mode, layout: KeyLayout) -> &'static ModeLayout {
+    match (layout, mode) {
+        (KeyLayout::Classic, Mode::Standard) => &STANDARD_LAYOUT,
+        (KeyLayout::Classic, Mode::Scientific) => &SCIENTIFIC_LAYOUT,
+        (KeyLayout::Classic, Mode::Programmer) => &PROGRAMMER_LAYOUT,
+        (KeyLayout::Mac, Mode::Standard) => &MAC_STANDARD_LAYOUT,
+        (KeyLayout::Mac, Mode::Scientific) => &MAC_SCIENTIFIC_LAYOUT,
+        (KeyLayout::Mac, Mode::Programmer) => &MAC_PROGRAMMER_LAYOUT,
+        // The Mac has no Statistics mode; its keys keep the Win7 arrangement.
+        (_, Mode::Statistics) => &STATISTICS_LAYOUT,
     }
 }
 
@@ -437,6 +675,8 @@ pub const EXTRAS_MIN_HEIGHT: f32 = 300.0;
 #[derive(Debug, Clone)]
 pub struct Layout {
     pub size: Vec2,
+    /// Size of a one-cell button.
+    pub button: Vec2,
     pub menu: Rect,
     pub display: Rect,
     /// Programmer toolbar: ASCII/Unicode switch, text field, Byte/Word flip.
@@ -463,22 +703,37 @@ pub fn line_h(t: &Theme) -> f32 {
     t.font.history.size + 5.0
 }
 
+/// Height in points of the in-window menu bar at `zoom`. Like the menus it opens, it
+/// keeps one size on screen ([`DEFAULT_SCALE`]) instead of scaling with the window.
+pub fn menu_bar_h(t: &Theme, zoom: f32) -> f32 {
+    t.menu.height * DEFAULT_SCALE / zoom
+}
+
+/// Height of a macOS-layout segmented control: about half a key, like the Mac's.
+pub fn segment_h(t: &Theme) -> f32 {
+    // Not rounded: `fill` relies on the layout growing linearly with the key size.
+    (t.spacing.button_height * 0.55).max(20.0)
+}
+
 pub fn bits_row_h(t: &Theme) -> f32 {
     t.font.bits.size * 2.0 + 6.0
 }
 
-/// Lays out the body for a mode. `menu` is false when the menu lives in the OS menu
-/// bar (macOS, KEY-001).
-pub fn compute(t: &Theme, mode: Mode, history: bool, extras: Extras, menu: bool) -> Layout {
-    let ml = for_mode(mode);
+/// Lays out the body for a mode. `menu_h` is the in-window menu bar's height in
+/// points, 0 when the menu lives in the OS menu bar (macOS, KEY-001).
+pub fn compute(t: &Theme, mode: Mode, history: bool, extras: Extras, menu_h: f32) -> Layout {
+    let ml = for_mode(mode, t.layout);
     let (pad, g) = (t.spacing.padding, t.spacing.gap);
     let radio_w = block_w(t, 2) + 8.0;
     let side_w = match ml.side {
         Side::Scientific => block_w(t, 5) + g,
         Side::Programmer => radio_w + g + block_w(t, 3) + g,
+        Side::Functions => block_w(t, 6) + g,
         Side::None => 0.0,
     };
-    let content_w = side_w + block_w(t, 5);
+    let content_w = side_w + block_w(t, ml.keypad_cols);
+    let row_h = t.spacing.button_height;
+    let mut radios = Vec::new();
     let list_h = t.display.history_lines as f32 * line_h(t);
     let display_h = t.display.height
         + match ml.list {
@@ -486,15 +741,42 @@ pub fn compute(t: &Theme, mode: Mode, history: bool, extras: Extras, menu: bool)
             List::Stats => list_h + line_h(t) + t.display.padding,
             List::History => 0.0,
         };
-    let menu_h = if menu { t.menu.height } else { 0.0 };
     let mut y = menu_h + pad;
     let display = Rect::from_min_size(pos2(pad, y), vec2(content_w, display_h));
     y += display_h + pad;
-    let tools = ml.bits.then(|| {
-        let r = Rect::from_min_size(pos2(pad, y), vec2(content_w, t.spacing.button_height));
+    // The macOS layout puts its switches on one compact toolbar row, like the Mac.
+    let tools_h = if ml.controls == Controls::None {
+        t.spacing.button_height
+    } else {
+        segment_h(t)
+    };
+    let mut tools = ml.bits.then(|| {
+        let r = Rect::from_min_size(pos2(pad, y), vec2(content_w, tools_h));
         y += r.height() + pad;
         r
     });
+    // `radios[0]` is always the angle or radix control, `radios[1]` the word size.
+    match ml.controls {
+        Controls::Angle => {
+            let h = segment_h(t);
+            let w = (3.0 * h * 2.2).min(content_w);
+            radios.push(Rect::from_min_size(pos2(pad, y), vec2(w, h)));
+            y += h + pad;
+        }
+        Controls::BaseWord => {
+            // Radix flush right, word size left of it, both inside the toolbar row; the
+            // ASCII | Unicode switch and the text field keep the rest.
+            if let Some(r) = &mut tools {
+                let w = 4.0 * r.height() * 1.05;
+                let base = Rect::from_min_max(pos2(r.right() - w, r.top()), r.max);
+                let word = base.translate(vec2(-(w + g), 0.0));
+                radios.push(base);
+                radios.push(word);
+                r.max.x = word.left() - g;
+            }
+        }
+        Controls::None => {}
+    }
     let bits = ml.bits.then(|| {
         let r = Rect::from_min_size(pos2(pad, y), vec2(content_w, 2.0 * bits_row_h(t)));
         y += r.height() + pad;
@@ -502,25 +784,22 @@ pub fn compute(t: &Theme, mode: Mode, history: bool, extras: Extras, menu: bool)
     });
     let keypad_h = block_h(t, ml.keypad_rows);
     let keypad = pos2(pad + side_w, y);
-    let (side, radios) = match ml.side {
-        Side::Scientific => (
-            Some(pos2(pad, y + t.spacing.button_height + g)),
-            vec![Rect::from_min_size(
+    let side = match ml.side {
+        Side::Scientific => {
+            radios.push(Rect::from_min_size(
                 pos2(pad, y),
-                vec2(block_w(t, 5), t.spacing.button_height),
-            )],
-        ),
+                vec2(block_w(t, 5), row_h),
+            ));
+            Some(pos2(pad, y + row_h + g))
+        }
         Side::Programmer => {
             let h = (keypad_h - g) / 2.0;
-            (
-                Some(pos2(pad + radio_w + g, y)),
-                vec![
-                    Rect::from_min_size(pos2(pad, y), vec2(radio_w, h)),
-                    Rect::from_min_size(pos2(pad, y + h + g), vec2(radio_w, h)),
-                ],
-            )
+            radios.push(Rect::from_min_size(pos2(pad, y), vec2(radio_w, h)));
+            radios.push(Rect::from_min_size(pos2(pad, y + h + g), vec2(radio_w, h)));
+            Some(pos2(pad + radio_w + g, y))
         }
-        Side::None => (None, vec![]),
+        Side::Functions => Some(pos2(pad, y)),
+        Side::None => None,
     };
     let mut size = vec2(pad * 2.0 + content_w, y + keypad_h + pad);
     let extras = (extras != Extras::None).then(|| {
@@ -532,6 +811,7 @@ pub fn compute(t: &Theme, mode: Mode, history: bool, extras: Extras, menu: bool)
     });
     Layout {
         size,
+        button: vec2(t.spacing.button_width, t.spacing.button_height),
         menu: Rect::from_min_size(Pos2::ZERO, vec2(size.x, menu_h)),
         display,
         tools,
@@ -543,6 +823,34 @@ pub fn compute(t: &Theme, mode: Mode, history: bool, extras: Extras, menu: bool)
     }
 }
 
+/// Lays out the body to fill `target` (the client size in points). Room beyond the
+/// natural size goes to the buttons, so a window resized out of the calculator's
+/// proportions has no empty bands. Never smaller than [`compute`].
+pub fn fill(
+    t: &Theme,
+    mode: Mode,
+    history: bool,
+    extras: Extras,
+    menu_h: f32,
+    target: Vec2,
+) -> Layout {
+    let base = compute(t, mode, history, extras, menu_h);
+    let extra = (target - base.size).max(Vec2::ZERO);
+    if extra.x < 0.5 && extra.y < 0.5 {
+        return base;
+    }
+    // The layout grows linearly with the button size: `per` is what one more point
+    // per button adds. Parts that don't grow (a minimum-height extras panel) give 0.
+    let mut grown = t.clone();
+    grown.spacing.button_width += 1.0;
+    grown.spacing.button_height += 1.0;
+    let per = compute(&grown, mode, history, extras, menu_h).size - base.size;
+    let step = |extra: f32, per: f32| if per > 0.0 { extra / per } else { 0.0 };
+    grown.spacing.button_width = t.spacing.button_width + step(extra.x, per.x);
+    grown.spacing.button_height = t.spacing.button_height + step(extra.y, per.y);
+    compute(&grown, mode, history, extras, menu_h)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -552,7 +860,7 @@ mod tests {
         // §2.1 targets at 100%: Standard ~228×322, Scientific ~414×322,
         // Programmer ~414×380, Statistics ~228×400 (menu included, frame excluded).
         let t = Theme::builtin();
-        let size = |m| compute(&t, m, false, Extras::None, true).size;
+        let size = |m| compute(&t, m, false, Extras::None, t.menu.height).size;
         let near = |v: Vec2, w: f32, h: f32| (v.x - w).abs() <= 24.0 && (v.y - h).abs() <= 60.0;
         assert!(
             near(size(Mode::Standard), 228.0, 300.0),
@@ -575,8 +883,74 @@ mod tests {
             size(Mode::Statistics)
         );
         // Extras panels add width beside the keypad (EXT-005).
-        let with = compute(&t, Mode::Standard, false, Extras::Units, true).size;
+        let with = compute(&t, Mode::Standard, false, Extras::Units, t.menu.height).size;
         assert!(with.x > size(Mode::Standard).x + 250.0);
+    }
+
+    fn mac() -> Theme {
+        calc_theme::ThemeStore::default().load("macos").unwrap()
+    }
+
+    #[test]
+    fn mac_tables_fit_their_grid_without_overlap() {
+        for mode in [
+            Mode::Standard,
+            Mode::Scientific,
+            Mode::Programmer,
+            Mode::Statistics,
+        ] {
+            let ml = for_mode(mode, KeyLayout::Mac);
+            let side_cols = if ml.side == Side::Functions { 6 } else { 0 };
+            for (keys, cols) in [(ml.keypad, ml.keypad_cols), (ml.side_keys, side_cols)] {
+                let mut used = std::collections::HashSet::new();
+                for b in keys {
+                    assert!(
+                        b.col + b.w <= cols && b.row + b.h <= ml.keypad_rows,
+                        "{mode:?} {}",
+                        b.label
+                    );
+                    for c in b.col..b.col + b.w {
+                        for r in b.row..b.row + b.h {
+                            assert!(used.insert((c, r)), "{mode:?}: {} overlaps", b.label);
+                        }
+                    }
+                }
+                // Every cell has a key.
+                assert_eq!(
+                    used.len(),
+                    cols as usize * ml.keypad_rows as usize,
+                    "{mode:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn fill_stretches_buttons_to_the_target() {
+        for t in [Theme::builtin(), mac()] {
+            for mode in [
+                Mode::Standard,
+                Mode::Scientific,
+                Mode::Programmer,
+                Mode::Statistics,
+            ] {
+                let base = compute(&t, mode, false, Extras::None, t.menu.height);
+                let target = base.size + vec2(300.0, 120.0);
+                let l = fill(&t, mode, false, Extras::None, t.menu.height, target);
+                assert!((l.size - target).length() < 0.5, "{mode:?}: {:?}", l.size);
+                assert!(l.button.x > base.button.x && l.button.y > base.button.y);
+                // A smaller target keeps the natural layout.
+                let small = fill(
+                    &t,
+                    mode,
+                    false,
+                    Extras::None,
+                    t.menu.height,
+                    base.size * 0.5,
+                );
+                assert_eq!(small.size, base.size);
+            }
+        }
     }
 
     #[test]
@@ -587,6 +961,9 @@ mod tests {
             .chain(PROGRAMMER)
             .chain(TOOLS)
             .chain(STATISTICS)
+            .chain(MAC_STANDARD)
+            .chain(MAC_SCIENTIFIC)
+            .chain(MAC_PROGRAMMER)
         {
             for (label, key) in [Some((b.label, b.key)), b.inv].into_iter().flatten() {
                 if let Some(id) = a11y_id(key, label) {

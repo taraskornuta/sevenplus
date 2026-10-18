@@ -5,10 +5,13 @@ use crate::i18n::{tr, tr_args};
 use crate::menu::MenuCommand;
 use calc_config::{MIN_OPACITY, SYSTEM_THEME};
 use calc_theme::Backdrop;
-use eframe::egui::{self, Align2, ComboBox, Context, ScrollArea, Vec2};
+use eframe::egui::{self, Align2, ComboBox, Context, ScrollArea, Vec2, vec2};
 
 /// Releases page linked from About (PKG-012: no auto-updater).
 const RELEASES: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/releases");
+
+/// Width the Preferences window takes when the calculator window is wide enough.
+const PREFS_WIDTH: f32 = 320.0;
 
 /// Separator choices offered in Preferences: (character, label).
 const DECIMALS: [(char, &str); 2] = [('.', ". (period)"), (',', ", (comma)")];
@@ -19,6 +22,21 @@ const GROUPS: [(char, &str); 5] = [
     ('\'', "' (apostrophe)"),
     ('_', "_ (underscore)"),
 ];
+
+/// Largest content size of a dialog that still fits the calculator window; anything
+/// taller or wider scrolls (the window is often smaller than the dialog's content).
+fn fit(ctx: &Context) -> Vec2 {
+    // Room for the title bar and frame margins.
+    // In points; dialogs keep one size on screen, so the margins shrink with zoom.
+    let k = crate::app::chrome_k(ctx);
+    (ctx.content_rect().size() - vec2(24.0, 48.0) * k).max(vec2(80.0, 60.0) * k)
+}
+
+/// Width for a combo box: the rest of its grid row, but never wider than needed.
+fn combo_w(ui: &egui::Ui) -> f32 {
+    let k = crate::app::chrome_k(ui.ctx());
+    (ui.available_width() - ui.spacing().icon_width - 8.0 * k).clamp(60.0 * k, 180.0 * k)
+}
 
 fn sep_label(c: char) -> String {
     match c {
@@ -36,6 +54,8 @@ impl App {
             .collapsible(false)
             .resizable(false)
             .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
+            .max_size(fit(ctx))
+            .scroll(true)
             .show(ctx, |ui| {
                 ui.heading(tr("app-name"));
                 ui.label(tr_args(
@@ -100,133 +120,164 @@ impl App {
             .resizable(false)
             .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
             .show(ctx, |ui| {
-                let s = &mut self.settings;
-                egui::Grid::new("prefs")
-                    .num_columns(2)
-                    .spacing([8.0, 6.0])
+                // A solid scroll bar shows there is more below; floating ones only
+                // appear on hover. Content wraps to the width instead of scrolling sideways.
+                let max = fit(ctx);
+                let k = crate::app::chrome_k(ctx);
+                ui.spacing_mut().scroll.floating = false;
+                ui.spacing_mut().slider_width = (max.x - 170.0 * k).clamp(50.0 * k, 100.0 * k);
+                // Scroll handles use the widget fills, which are near the window color in
+                // most themes; draw them in the border color so they can be seen. The
+                // controls inside keep the usual look.
+                let visuals = ui.visuals().clone();
+                let handle = crate::paint::c(self.theme.controls.border);
+                let ws = &mut ui.visuals_mut().widgets;
+                for w in [&mut ws.inactive, &mut ws.hovered, &mut ws.active] {
+                    w.bg_fill = handle;
+                }
+                // As wide as the content wants, as far as the calculator window allows.
+                ui.set_width(max.x.min(PREFS_WIDTH * k));
+                ScrollArea::both()
+                    .auto_shrink([false, true])
+                    .max_height(max.y)
                     .show(ui, |ui| {
-                        ui.label(tr("prefs-theme"));
-                        let current = if s.theme == SYSTEM_THEME {
-                            tr("themes-follow-system")
-                        } else {
-                            name_of(&s.theme)
-                        };
-                        ComboBox::from_id_salt("pref-theme")
-                            .selected_text(current)
-                            .show_ui(ui, |ui| {
-                                if ui
-                                    .selectable_label(
-                                        s.theme == SYSTEM_THEME,
-                                        tr("themes-follow-system"),
-                                    )
-                                    .clicked()
-                                {
-                                    chosen = Some(SYSTEM_THEME.to_string());
-                                }
-                                for t in &themes {
-                                    if ui.selectable_label(s.theme == t.id, &t.name).clicked() {
-                                        chosen = Some(t.id.clone());
+                        *ui.visuals_mut() = visuals;
+                        let s = &mut self.settings;
+                        egui::Grid::new("prefs")
+                            .num_columns(2)
+                            .spacing([8.0, 6.0])
+                            .show(ui, |ui| {
+                                ui.label(tr("prefs-theme"));
+                                let current = if s.theme == SYSTEM_THEME {
+                                    tr("themes-follow-system")
+                                } else {
+                                    name_of(&s.theme)
+                                };
+                                ComboBox::from_id_salt("pref-theme")
+                                    .width(combo_w(ui))
+                                    .selected_text(current)
+                                    .show_ui(ui, |ui| {
+                                        if ui
+                                            .selectable_label(
+                                                s.theme == SYSTEM_THEME,
+                                                tr("themes-follow-system"),
+                                            )
+                                            .clicked()
+                                        {
+                                            chosen = Some(SYSTEM_THEME.to_string());
+                                        }
+                                        for t in &themes {
+                                            if ui
+                                                .selectable_label(s.theme == t.id, &t.name)
+                                                .clicked()
+                                            {
+                                                chosen = Some(t.id.clone());
+                                            }
+                                        }
+                                    });
+                                ui.end_row();
+                                for (label, value, salt) in [
+                                    (tr("prefs-theme-light"), &mut s.theme_light, "pref-light"),
+                                    (tr("prefs-theme-dark"), &mut s.theme_dark, "pref-dark"),
+                                ] {
+                                    ui.label(label);
+                                    let before = value.clone();
+                                    ComboBox::from_id_salt(salt)
+                                        .width(combo_w(ui))
+                                        .selected_text(name_of(value))
+                                        .show_ui(ui, |ui| {
+                                            for t in &themes {
+                                                ui.selectable_value(value, t.id.clone(), &t.name);
+                                            }
+                                        });
+                                    if *value != before && s.theme == SYSTEM_THEME {
+                                        chosen = Some(SYSTEM_THEME.to_string());
                                     }
+                                    ui.end_row();
                                 }
                             });
-                        ui.end_row();
-                        for (label, value, salt) in [
-                            (tr("prefs-theme-light"), &mut s.theme_light, "pref-light"),
-                            (tr("prefs-theme-dark"), &mut s.theme_dark, "pref-dark"),
-                        ] {
-                            ui.label(label);
-                            let before = value.clone();
-                            ComboBox::from_id_salt(salt)
-                                .selected_text(name_of(value))
-                                .show_ui(ui, |ui| {
-                                    for t in &themes {
-                                        ui.selectable_value(value, t.id.clone(), &t.name);
-                                    }
-                                });
-                            if *value != before && s.theme == SYSTEM_THEME {
-                                chosen = Some(SYSTEM_THEME.to_string());
-                            }
-                            ui.end_row();
+                        if ui
+                            .checkbox(&mut s.follow_high_contrast, tr("prefs-high-contrast"))
+                            .changed()
+                        {
+                            chosen = Some(s.theme.clone());
+                        }
+                        ui.checkbox(&mut s.transparency, tr("prefs-transparency"));
+                        ui.add_enabled_ui(s.transparency && glass_theme, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(tr("prefs-opacity"));
+                                ui.add(
+                                    egui::Slider::new(&mut s.opacity, MIN_OPACITY..=1.0)
+                                        .custom_formatter(|v, _| format!("{:.0}%", v * 100.0))
+                                        .custom_parser(|t| {
+                                            t.trim_end_matches('%')
+                                                .trim()
+                                                .parse::<f64>()
+                                                .ok()
+                                                .map(|v| v / 100.0)
+                                        }),
+                                );
+                            });
+                        });
+                        if !glass_theme {
+                            ui.label(egui::RichText::new(tr("prefs-no-glass")).small());
+                        }
+                        ui.separator();
+                        ui.strong(tr("prefs-numbers"));
+                        egui::Grid::new("prefs-num")
+                            .num_columns(2)
+                            .spacing([8.0, 6.0])
+                            .show(ui, |ui| {
+                                for (label, value, choices, system, salt) in [
+                                    (
+                                        tr("prefs-decimal"),
+                                        &mut s.decimal_separator,
+                                        &DECIMALS[..],
+                                        os.decimal,
+                                        "pref-dec",
+                                    ),
+                                    (
+                                        tr("prefs-group"),
+                                        &mut s.group_separator,
+                                        &GROUPS[..],
+                                        os.group,
+                                        "pref-grp",
+                                    ),
+                                ] {
+                                    ui.label(label);
+                                    let from_os = tr_args(
+                                        "prefs-from-locale",
+                                        &[("sep", sep_label(system).into())],
+                                    );
+                                    let shown = match *value {
+                                        None => from_os.clone(),
+                                        Some(c) => choices
+                                            .iter()
+                                            .find(|(x, _)| *x == c)
+                                            .map_or_else(|| c.to_string(), |(_, l)| l.to_string()),
+                                    };
+                                    ComboBox::from_id_salt(salt)
+                                        .width(combo_w(ui))
+                                        .selected_text(shown)
+                                        .show_ui(ui, |ui| {
+                                            ui.selectable_value(value, None, from_os);
+                                            for (ch, l) in choices {
+                                                ui.selectable_value(value, Some(*ch), *l);
+                                            }
+                                        });
+                                    ui.end_row();
+                                }
+                            });
+                        ui.checkbox(&mut s.copy_locale_decimal, tr("prefs-copy-locale"));
+                        ui.checkbox(&mut s.copy_grouping, tr("prefs-copy-grouping"));
+                        ui.separator();
+                        ui.strong(tr("prefs-programmer"));
+                        ui.checkbox(&mut s.programmer_c_signs, tr("prefs-c-signs"));
+                        ui.separator();
+                        if ui.button(tr("prefs-open-folder")).clicked() {
+                            crate::app::open_path(&calc_config::config_dir());
                         }
                     });
-                if ui
-                    .checkbox(&mut s.follow_high_contrast, tr("prefs-high-contrast"))
-                    .changed()
-                {
-                    chosen = Some(s.theme.clone());
-                }
-                ui.checkbox(&mut s.transparency, tr("prefs-transparency"));
-                ui.add_enabled_ui(s.transparency && glass_theme, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(tr("prefs-opacity"));
-                        ui.add(
-                            egui::Slider::new(&mut s.opacity, MIN_OPACITY..=1.0)
-                                .custom_formatter(|v, _| format!("{:.0}%", v * 100.0))
-                                .custom_parser(|t| {
-                                    t.trim_end_matches('%')
-                                        .trim()
-                                        .parse::<f64>()
-                                        .ok()
-                                        .map(|v| v / 100.0)
-                                }),
-                        );
-                    });
-                });
-                if !glass_theme {
-                    ui.label(egui::RichText::new(tr("prefs-no-glass")).small());
-                }
-                ui.separator();
-                ui.strong(tr("prefs-numbers"));
-                egui::Grid::new("prefs-num")
-                    .num_columns(2)
-                    .spacing([8.0, 6.0])
-                    .show(ui, |ui| {
-                        for (label, value, choices, system, salt) in [
-                            (
-                                tr("prefs-decimal"),
-                                &mut s.decimal_separator,
-                                &DECIMALS[..],
-                                os.decimal,
-                                "pref-dec",
-                            ),
-                            (
-                                tr("prefs-group"),
-                                &mut s.group_separator,
-                                &GROUPS[..],
-                                os.group,
-                                "pref-grp",
-                            ),
-                        ] {
-                            ui.label(label);
-                            let from_os =
-                                tr_args("prefs-from-locale", &[("sep", sep_label(system).into())]);
-                            let shown = match *value {
-                                None => from_os.clone(),
-                                Some(c) => choices
-                                    .iter()
-                                    .find(|(x, _)| *x == c)
-                                    .map_or_else(|| c.to_string(), |(_, l)| l.to_string()),
-                            };
-                            ComboBox::from_id_salt(salt)
-                                .selected_text(shown)
-                                .show_ui(ui, |ui| {
-                                    ui.selectable_value(value, None, from_os);
-                                    for (ch, l) in choices {
-                                        ui.selectable_value(value, Some(*ch), *l);
-                                    }
-                                });
-                            ui.end_row();
-                        }
-                    });
-                ui.checkbox(&mut s.copy_locale_decimal, tr("prefs-copy-locale"));
-                ui.checkbox(&mut s.copy_grouping, tr("prefs-copy-grouping"));
-                ui.separator();
-                ui.strong(tr("prefs-programmer"));
-                ui.checkbox(&mut s.programmer_c_signs, tr("prefs-c-signs"));
-                ui.separator();
-                if ui.button(tr("prefs-open-folder")).clicked() {
-                    crate::app::open_path(&calc_config::config_dir());
-                }
             });
         self.prefs_open = open;
         if let Some(id) = chosen {

@@ -72,8 +72,13 @@ pub struct Settings {
     pub opacity: f32,
 }
 
+/// Scale of a fresh install and of View ▸ Reset size. Menus, dialogs and tooltips
+/// always use it, whatever the window's zoom, so at this scale they match the body.
+/// 1.25 gives text the size of common desktop apps' menus.
+pub const DEFAULT_SCALE: f32 = 1.25;
+
 /// Lowest window opacity the Preferences slider allows.
-pub const MIN_OPACITY: f32 = 0.5;
+pub const MIN_OPACITY: f32 = 0.2;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -90,7 +95,7 @@ impl Default for Settings {
             angle: Angle::Degrees,
             base: Base::Dec,
             word: WordSize::Qword,
-            scale: 1.0,
+            scale: DEFAULT_SCALE,
             window_pos: None,
             window_ppp: None,
             decimal_separator: None,
@@ -263,7 +268,7 @@ impl Settings {
             Settings::default().opacity
         };
         if !settings.scale.is_finite() {
-            settings.scale = 1.0;
+            settings.scale = DEFAULT_SCALE;
         }
         Loaded {
             settings,

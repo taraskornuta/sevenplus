@@ -6,7 +6,7 @@ All commands run from the repository root. The Rust version is pinned in `rust-t
 
 ## Before you start (all platforms)
 
-Generate the third-party license list that Help ▸ Licenses shows. A copy is already committed, so you only need this after changing dependencies:
+Generate the third-party license list that ☰ ▸ Help ▸ Licenses shows. A copy is already committed, so you only need this after changing dependencies:
 
 ```sh
 cargo install cargo-about --features cli --locked

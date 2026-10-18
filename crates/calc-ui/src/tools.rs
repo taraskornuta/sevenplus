@@ -5,12 +5,11 @@
 use crate::app::App;
 use crate::i18n::tr;
 use crate::layout::TOOLS;
-use crate::paint::{self, c};
+use crate::paint;
 use calc_core::{CharMode, Num, from_chars, to_chars};
-use calc_theme::{Group, State};
+use calc_theme::KeyLayout;
 use eframe::egui::{
-    self, Align, Align2, Color32, FontId, Id, Rect, Sense, Stroke, StrokeKind, TextEdit,
-    WidgetInfo, WidgetType, pos2, vec2,
+    self, Align, Color32, FontId, Id, Rect, Stroke, StrokeKind, TextEdit, pos2, vec2,
 };
 
 /// Horizontal padding inside the switch halves and buttons.
@@ -23,33 +22,46 @@ pub(crate) fn chars_field_id() -> Id {
 
 impl App {
     pub(crate) fn draw_tools(&mut self, ui: &mut egui::Ui, rect: Rect) {
-        let font = paint::font(self.theme.font.button);
+        let mac = self.theme.layout == KeyLayout::Mac;
+        // The macOS toolbar is compact: UI-size text, tight segments.
+        let (font, pad_x) = if mac {
+            (paint::font(self.theme.font.ui), PAD_X * 0.8)
+        } else {
+            (paint::font(self.theme.font.button), PAD_X)
+        };
         let width = |text: &str| {
             ui.painter()
                 .layout_no_wrap(text.to_string(), font.clone(), Color32::BLACK)
                 .size()
                 .x
-                + 2.0 * PAD_X
+                + 2.0 * pad_x
         };
         let g = self.theme.spacing.gap.max(4.0);
 
-        // ASCII | Unicode switch, flush left.
         let modes = [
             (CharMode::Ascii, tr("chars-ascii")),
             (CharMode::Unicode, tr("chars-unicode")),
         ];
-        let mut x = rect.left();
-        for (i, (mode, label)) in modes.iter().enumerate() {
-            let r = Rect::from_min_size(pos2(x, rect.top()), vec2(width(label), rect.height()));
-            x = r.right();
-            self.draw_segment(ui, r, *mode, label, i);
+        // ASCII | Unicode switch, flush left: the same segmented control in every theme.
+        let w: f32 = modes.iter().map(|(_, l)| width(l)).sum();
+        let r = Rect::from_min_size(rect.min, vec2(w, rect.height()));
+        let items: Vec<(&str, String)> =
+            modes.iter().map(|(_, l)| (l.as_str(), l.clone())).collect();
+        let sel = modes
+            .iter()
+            .position(|(m, _)| *m == self.settings.programmer_chars)
+            .unwrap_or(0);
+        if let Some(i) = self.segmented(ui, r, &items, sel, "chars-mode") {
+            self.settings.programmer_chars = modes[i].0;
         }
+        let x = r.right();
         let field_left = x + g;
 
-        // Byte flip / Word flip, flush right.
+        // Byte flip / Word flip, flush right. The macOS layout has them as keys.
         let mut right = rect.right();
         let mut keys = Vec::new();
-        for b in TOOLS.iter().rev() {
+        let flips = if mac { &[][..] } else { TOOLS };
+        for b in flips.iter().rev() {
             let w = width(b.label);
             keys.push((
                 Rect::from_min_size(pos2(right - w, rect.top()), vec2(w, rect.height())),
@@ -76,53 +88,6 @@ impl App {
         }
     }
 
-    /// One half of the ASCII | Unicode switch, styled like a function key that is
-    /// pressed while selected.
-    fn draw_segment(&mut self, ui: &egui::Ui, rect: Rect, mode: CharMode, label: &str, i: usize) {
-        let selected = self.settings.programmer_chars == mode;
-        let resp = ui.interact(rect, Id::new(("chars-mode", i)), Sense::click());
-        resp.widget_info(|| WidgetInfo::selected(WidgetType::RadioButton, true, selected, label));
-        let state = if selected || resp.is_pointer_button_down_on() {
-            State::Pressed
-        } else if resp.hovered() {
-            State::Hover
-        } else if resp.has_focus() {
-            State::Focus
-        } else {
-            State::Normal
-        };
-        let t = &self.theme.button;
-        let s = t.style(Group::Function, state);
-        let p = ui.painter();
-        paint::button_body(
-            p,
-            rect,
-            t.radius_of(s),
-            s.fill.stops(),
-            c(s.border),
-            c(s.highlight),
-        );
-        if resp.has_focus() && state != State::Focus {
-            let f = t.style(Group::Function, State::Focus);
-            p.rect_stroke(
-                rect.shrink(2.0),
-                paint::radius(t.radius_of(f) - 1.0),
-                Stroke::new(1.0, c(f.border)),
-                StrokeKind::Inside,
-            );
-        }
-        p.text(
-            rect.center(),
-            Align2::CENTER_CENTER,
-            label,
-            paint::font(self.theme.font.button),
-            c(s.text),
-        );
-        if resp.clicked() {
-            self.settings.programmer_chars = mode;
-        }
-    }
-
     /// The value as text. While it is edited, each change that encodes to a value
     /// loads it; otherwise the field follows the value.
     fn draw_chars_field(&mut self, ui: &mut egui::Ui, rect: Rect, font: FontId) {
@@ -133,6 +98,8 @@ impl App {
             let text = to_chars(self.calc.bits(), self.calc.word, mode);
             self.chars_text = readable(ui.ctx(), &font, &text);
         }
+        // Part of the calculator body: scales with the window, unlike dialogs.
+        ui.set_style(self.body_style.clone());
         let resp = ui.put(
             rect,
             TextEdit::singleline(&mut self.chars_text)

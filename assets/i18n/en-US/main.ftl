@@ -9,6 +9,10 @@ app-name = SevenPlus Calculator
 menu-view = View
 menu-edit = Edit
 menu-help = Help
+# The ☰ button that opens all menus.
+menu-main = Menu
+# ☰ submenu with unit conversion, date calculation and worksheets.
+menu-tools = Tools
 mode-standard = Standard
 mode-scientific = Scientific
 mode-programmer = Programmer

@@ -160,6 +160,9 @@ pub struct Theme {
     /// `system` asks for native backdrop materials where available (THM-010).
     #[serde(default)]
     pub backdrop: Backdrop,
+    /// Which key arrangement the keypads use.
+    #[serde(default)]
+    pub layout: KeyLayout,
     pub font: Fonts,
     pub spacing: Spacing,
     pub window: WindowCfg,
@@ -182,6 +185,16 @@ pub enum Backdrop {
     #[default]
     Solid,
     System,
+}
+
+/// Key arrangement: the Windows 7 calculator's, or the macOS Calculator's (one block
+/// per mode, operators in the right column, segmented controls instead of radios).
+#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum KeyLayout {
+    #[default]
+    Classic,
+    Mac,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -736,6 +749,9 @@ mod tests {
             let glass = matches!(*id, "aero7" | "macos" | "glass" | "glass-dark");
             let backdrop = store.load(id).unwrap().backdrop;
             assert_eq!(backdrop == Backdrop::System, glass, "{id}");
+            let layout = store.load(id).unwrap().layout;
+            let mac = *id == "macos";
+            assert_eq!(layout == KeyLayout::Mac, mac, "{id}");
         }
     }
 

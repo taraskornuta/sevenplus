@@ -17,7 +17,7 @@ Operations run as you type, left to right: `2 + 3 * 4 =` gives 20, as on a pocke
 - `√`, `1/x` and `±` act on the current number and show up in the expression line, e.g. `sqrt(9)`.
 - Pressing `=` again repeats the last operation: `2 + 3 = =` gives 8.
 - **History** (`Ctrl+H`) lists finished calculations. Click one to reuse its result.
-- **Digit grouping** (View menu) shows `1,234,567.5`, using your system's separators.
+- **Digit grouping** (☰ menu) shows `1,234,567.5`, using your system's separators.
 
 Arithmetic is exact. `0.1 + 0.2` is `0.3` and `1 / 3 * 3` is `1`, because numbers are kept as exact fractions until a function like `sin` or `ln` needs an approximation. Results show 16 significant digits, rounded half to even.
 
@@ -67,7 +67,7 @@ These panels open beside the keypad, and the window grows to fit them:
 
 ![Dark, Classic, Light and High Contrast themes](docs/screenshots/themes.png)
 
-Eight themes are built in: **Light** (the default), **Dark**, **Glass**, **Glass Dark**, **macOS** (dark grey display, flat grey keys, orange operators), **Aero 7** (glass blue), **Classic** and **High Contrast**. By default the calculator follows your system's light/dark setting, using Light or Dark, and it switches to High Contrast when the system's high-contrast mode is on. Switching themes takes effect immediately, without losing your calculation.
+Eight themes are built in: **Light** (the default), **Dark**, **Glass**, **Glass Dark**, **macOS** (the macOS Calculator: round keys, orange operators, segmented controls and its key arrangement), **Aero 7** (glass blue), **Classic** and **High Contrast**. By default the calculator follows your system's light/dark setting, using Light or Dark, and it switches to High Contrast when the system's high-contrast mode is on. Switching themes takes effect immediately, without losing your calculation.
 
 **Glass.** Glass, Glass Dark, macOS and Aero 7 make the window see-through, with the desktop blurred behind it:
 
@@ -78,7 +78,7 @@ Eight themes are built in: **Light** (the default), **Dark**, **Glass**, **Glass
 | macOS | Blur |
 | GNOME, older Windows | See-through, without blur |
 
-Preferences ▸ **Transparency effects** turns this off, and **Window opacity** (50–100%) sets how much shows through. When Windows or macOS is set to reduce transparency, the window stays opaque.
+Preferences ▸ **Transparency effects** turns this off, and **Window opacity** (20–100%) sets how much shows through. When Windows or macOS is set to reduce transparency, the window stays opaque.
 
 Every color, size and font is a token in a TOML file, and you can add your own themes without rebuilding anything. See [docs/themes.md](docs/themes.md).
 
@@ -113,7 +113,7 @@ On Linux it runs under both Wayland and X11. Each release also has a `SHA256SUMS
 | User themes | `~/.config/sevenplus/themes/` | `~/Library/Application Support/sevenplus/themes/` | `%APPDATA%\sevenplus\themes\` |
 | Logs and crash reports | `~/.local/state/sevenplus/` | `~/Library/Logs/sevenplus/` | `%LOCALAPPDATA%\sevenplus\data\logs\` |
 
-Most options are under **Edit ▸ Preferences** (`Ctrl+,`): theme, decimal and group separators, and copy format. The calculator saves settings itself. If the settings file is ever damaged, it is renamed to `settings.toml.bak` and the defaults are used. Set `RUST_LOG=info` for more detailed logs.
+Most options are under **☰ ▸ Preferences** (`Ctrl+,`; on macOS in the menu bar): theme, decimal and group separators, and copy format. The calculator saves settings itself. If the settings file is ever damaged, it is renamed to `settings.toml.bak` and the defaults are used. Set `RUST_LOG=info` for more detailed logs.
 
 ## Building
 
@@ -143,4 +143,4 @@ The workspace has six crates:
 
 ## License
 
-MIT. The bundled Inter font is under the SIL Open Font License 1.1. Third-party licenses are listed in Help ▸ Licenses.
+MIT. The bundled Inter font is under the SIL Open Font License 1.1. Third-party licenses are listed in ☰ ▸ Help ▸ Licenses.

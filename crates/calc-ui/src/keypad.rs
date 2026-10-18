@@ -5,23 +5,28 @@ use crate::i18n::{num, tr, tr_args};
 use crate::layout::{self, Button, Layout, bits_row_h};
 use crate::paint::{self, RadioColors, c};
 use calc_core::{Angle, Base, Key, Mode, WordSize};
-use calc_theme::State;
+use calc_theme::{Group, KeyLayout, State};
 use eframe::egui::{
-    self, Align2, Color32, FontId, Id, Rect, Sense, WidgetInfo, WidgetType, pos2, vec2,
+    self, Align2, Color32, FontId, Id, Rect, Sense, WidgetInfo, WidgetType, emath::easing, pos2,
+    vec2,
 };
+
+/// How long a button takes to fade into and out of its hover color.
+const HOVER_SECS: f32 = 0.10;
+/// How long a released button takes to ease back from its pressed color.
+const RELEASE_SECS: f32 = 0.15;
 
 /// Plain-text form of label markup for screen readers.
 fn plain(label: &str) -> String {
-    label.replace(['^', '~', '{', '}'], "")
+    label.replace(['^', '_', '~', '{', '}'], "")
 }
 
 impl App {
     /// Draws the side block and the main keypad. Buttons are registered in reading
     /// order (row by row across both blocks) so Tab follows it (UI-022).
     pub(crate) fn draw_keypads(&mut self, ui: &egui::Ui, l: &Layout, off: egui::Vec2) {
-        let ml = layout::for_mode(self.calc.mode);
-        let sp = self.theme.spacing;
-        let (bw, bh, g) = (sp.button_width, sp.button_height, sp.gap);
+        let ml = layout::for_mode(self.calc.mode, self.theme.layout);
+        let (bw, bh, g) = (l.button.x, l.button.y, self.theme.spacing.gap);
         let ppp = ui.ctx().pixels_per_point();
         let mut all: Vec<(Rect, &Button, &str)> = Vec::new();
         let mut place = |origin: egui::Pos2, keys: &'static [Button], block: &'static str| {
@@ -94,28 +99,46 @@ impl App {
             .is_some_and(|(k, t)| k == key && now - t < FLASH_SECS);
         // Inv is a toggle: drawn pressed while active.
         let toggled = key == Key::Inv && self.calc.inv;
-        let state = if !enabled {
+        let pressed = enabled && (resp.is_pointer_button_down_on() || flashing || toggled);
+        // Press shows at once and eases back on release; hover fades both ways. Both
+        // animate from their current value, so a quick re-press or re-hover never jumps.
+        let ctx = ui.ctx();
+        let hover_t = ctx.animate_bool_with_time_and_easing(
+            resp.id.with("hover"),
+            enabled && resp.hovered(),
+            HOVER_SECS,
+            easing::cubic_out,
+        );
+        let press_t = ctx.animate_value_with_time(
+            resp.id.with("press"),
+            if pressed { 1.0 } else { 0.0 },
+            if pressed { 0.0 } else { RELEASE_SECS },
+        );
+        let press_t = 1.0 - easing::cubic_out(1.0 - press_t);
+        let base = if !enabled {
             State::Disabled
-        } else if resp.is_pointer_button_down_on() || flashing || toggled {
-            State::Pressed
-        } else if resp.hovered() {
-            State::Hover
         } else if resp.has_focus() {
             State::Focus
         } else {
             State::Normal
         };
-        let s = t.style(b.kind, state);
+        let style = |s| t.style(b.kind, s);
+        let s = if enabled {
+            let hovered = paint::blend(style(base), style(State::Hover), hover_t);
+            paint::blend(&hovered, style(State::Pressed), press_t)
+        } else {
+            style(base).clone()
+        };
         let p = ui.painter();
         paint::button_body(
             p,
             rect,
-            t.radius_of(s),
+            t.radius_of(&s),
             s.fill.stops(),
             c(s.border),
             c(s.highlight),
         );
-        if resp.has_focus() && state != State::Focus {
+        if resp.has_focus() && (hover_t > 0.0 || press_t > 0.0) {
             let f = t.style(b.kind, State::Focus);
             p.rect_stroke(
                 rect.shrink(2.0),
@@ -124,7 +147,14 @@ impl App {
                 egui::StrokeKind::Inside,
             );
         }
-        let font = paint::font(self.theme.font.button);
+        let mut font = paint::font(self.theme.font.button);
+        // The macOS layout draws its operator signs large, as the Mac does.
+        if self.theme.layout == KeyLayout::Mac
+            && matches!(b.kind, Group::Operator | Group::Equals)
+            && label.chars().count() == 1
+        {
+            font.size *= 1.4;
+        }
         paint::rich_label(p, rect.center(), label, font, c(s.text));
         resp.clicked().then_some(key)
     }
@@ -213,7 +243,93 @@ impl App {
         clicked
     }
 
+    /// A segmented control in the macOS style: a low, slightly rounded track with thin
+    /// separators and the selected segment raised. `items` are (shown text, accessible
+    /// name).
+    pub(crate) fn segmented(
+        &self,
+        ui: &egui::Ui,
+        rect: Rect,
+        items: &[(&str, String)],
+        selected: usize,
+        id: &str,
+    ) -> Option<usize> {
+        const RADIUS: f32 = 6.0;
+        let t = &self.theme.button;
+        let track = t.style(Group::Function, State::Normal);
+        let p = ui.painter();
+        paint::gradient_rect(p, rect, RADIUS, track.fill.stops());
+        let w = rect.width() / items.len() as f32;
+        let font = paint::font(self.theme.font.ui);
+        let divider = c(self.theme.controls.group_border);
+        let mut clicked = None;
+        for (i, (text, name)) in items.iter().enumerate() {
+            let cell = Rect::from_min_size(
+                pos2(rect.left() + i as f32 * w, rect.top()),
+                vec2(w, rect.height()),
+            );
+            let resp = ui
+                .interact(cell, Id::new((id, i)), Sense::click())
+                .on_hover_text(name);
+            let on = i == selected;
+            resp.widget_info(|| WidgetInfo::selected(WidgetType::RadioButton, true, on, name));
+            // A hairline between two unselected segments.
+            if i > 0 && !on && i - 1 != selected {
+                let x = cell.left().round();
+                p.line_segment(
+                    [pos2(x, cell.top() + 5.0), pos2(x, cell.bottom() - 5.0)],
+                    egui::Stroke::new(1.0, divider),
+                );
+            }
+            // The Mac's raised tile is the edit-key grey; Win7-style themes, whose memory
+            // keys are often bare text, show the selection as a pressed key.
+            let raised = if self.theme.layout == KeyLayout::Mac {
+                t.style(Group::Memory, State::Normal)
+            } else {
+                t.style(Group::Function, State::Pressed)
+            };
+            let style = if on {
+                Some(raised)
+            } else if resp.is_pointer_button_down_on() {
+                Some(t.style(Group::Function, State::Pressed))
+            } else if resp.hovered() {
+                Some(t.style(Group::Function, State::Hover))
+            } else {
+                None
+            };
+            let inner = cell.shrink(2.0);
+            if let Some(s) = style {
+                paint::gradient_rect(p, inner, RADIUS - 2.0, s.fill.stops());
+            }
+            if resp.has_focus() {
+                let f = t.style(Group::Function, State::Focus);
+                p.rect_stroke(
+                    inner,
+                    paint::radius(RADIUS - 2.0),
+                    egui::Stroke::new(1.5, c(f.border)),
+                    egui::StrokeKind::Inside,
+                );
+            }
+            let text_color = style.unwrap_or(track).text;
+            p.text(
+                cell.center(),
+                Align2::CENTER_CENTER,
+                *text,
+                font.clone(),
+                c(text_color),
+            );
+            if resp.clicked() {
+                clicked = Some(i);
+            }
+        }
+        clicked
+    }
+
     pub(crate) fn draw_radios(&mut self, ui: &egui::Ui, radios: &[Rect]) {
+        if self.theme.layout == KeyLayout::Mac {
+            self.draw_segments(ui, radios);
+            return;
+        }
         let labels = |ids: &[&str]| ids.iter().map(|id| tr(id)).collect::<Vec<_>>();
         match self.calc.mode {
             Mode::Scientific => {
@@ -250,6 +366,60 @@ impl App {
         }
     }
 
+    /// The angle, radix and word-size controls of the macOS layout.
+    fn draw_segments(&mut self, ui: &egui::Ui, rects: &[Rect]) {
+        let items = |pairs: &[(&'static str, &str)]| -> Vec<(&'static str, String)> {
+            pairs.iter().map(|(short, id)| (*short, tr(id))).collect()
+        };
+        match self.calc.mode {
+            Mode::Scientific => {
+                let angles = [Angle::Degrees, Angle::Radians, Angle::Gradians];
+                let sel = angles
+                    .iter()
+                    .position(|a| *a == self.calc.angle)
+                    .unwrap_or(0);
+                let names = items(&[
+                    ("Deg", "angle-degrees"),
+                    ("Rad", "angle-radians"),
+                    ("Grad", "angle-grads"),
+                ]);
+                if let Some(i) = self.segmented(ui, rects[0], &names, sel, "angle") {
+                    self.calc.angle = angles[i];
+                }
+            }
+            Mode::Programmer => {
+                let bases = [Base::Hex, Base::Dec, Base::Oct, Base::Bin];
+                let sel = bases.iter().position(|b| *b == self.calc.base).unwrap_or(1);
+                let names = items(&[
+                    ("16", "base-hex"),
+                    ("10", "base-dec"),
+                    ("8", "base-oct"),
+                    ("2", "base-bin"),
+                ]);
+                if let Some(i) = self.segmented(ui, rects[0], &names, sel, "base") {
+                    self.calc.set_base(bases[i]);
+                }
+                let words = [
+                    WordSize::Qword,
+                    WordSize::Dword,
+                    WordSize::Word,
+                    WordSize::Byte,
+                ];
+                let sel = words.iter().position(|w| *w == self.calc.word).unwrap_or(0);
+                let names = items(&[
+                    ("64", "word-qword"),
+                    ("32", "word-dword"),
+                    ("16", "word-word"),
+                    ("8", "word-byte"),
+                ]);
+                if let Some(i) = self.segmented(ui, rects[1], &names, sel, "word") {
+                    self.calc.set_word(words[i]);
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// The 64-bit panel in groups of four; clicking a bit toggles it (PRG-005).
     pub(crate) fn draw_bits(&mut self, ui: &egui::Ui, rect: Rect) {
         let b = self.theme.bits.clone();
@@ -257,7 +427,9 @@ impl App {
         let p = ui.painter().clone();
         let bits = self.calc.bits();
         let word = self.calc.word.bits();
-        let cell = (rect.width() / 39.0).min(size * 0.9);
+        // Cells are as wide as the panel allows, up to a little over the font size, so
+        // single bits are easy to hit.
+        let cell = (rect.width() / 39.0).min(size * 1.15);
         let row_h = bits_row_h(&self.theme);
         let font = paint::font(self.theme.font.bits);
         let small = FontId::new(size * 0.85, font.family.clone());
@@ -269,11 +441,13 @@ impl App {
                 let bit = 63 - (row * 32 + j);
                 let x = x0 + (j + j / 4) as f32 * cell;
                 let r = Rect::from_min_size(pos2(x, y), vec2(cell, size + 4.0));
+                // The clickable area also covers the index line below the digit.
+                let hit = Rect::from_min_size(r.min, vec2(cell, row_h - 1.0));
                 let active = (bit as u32) < word;
                 let on = (bits >> bit) & 1 == 1;
                 let color = if active { c(b.text) } else { c(b.dim) };
                 if active {
-                    let resp = ui.interact(r, Id::new(("bit", bit)), Sense::click());
+                    let resp = ui.interact(hit, Id::new(("bit", bit)), Sense::click());
                     resp.widget_info(|| {
                         WidgetInfo::selected(
                             WidgetType::Checkbox,
@@ -283,7 +457,7 @@ impl App {
                         )
                     });
                     if resp.hovered() || resp.has_focus() {
-                        p.rect_filled(r, 2.0, c(self.theme.controls.hover));
+                        p.rect_filled(hit, 3.0, c(self.theme.controls.hover));
                     }
                     if resp.clicked() {
                         toggle = Some(bit as u32);
